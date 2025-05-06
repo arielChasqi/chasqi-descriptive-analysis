@@ -31,9 +31,9 @@ def get_collection(tenant_id, collection_base):
     db = client[db_name]
 
     #print(f"Conectando al client {client} -----------------------------> '")
-    print(f"Conectando al db_name {db_name} con colección 'evaluation'")
-    print(f"Conectando al plural tenant {plural_tenant} con colección 'evaluation'")
-    print(f"Conectando a la colección {collection_name} con colección 'evaluation'")
-    print(f"Conectando a la base de datos {db} con colección 'evaluation'")
+    #print(f"Conectando al db_name {db_name} con colección 'evaluation'")
+    #print(f"Conectando al plural tenant {plural_tenant} con colección 'evaluation'")
+    #print(f"Conectando a la colección {collection_name} con colección 'evaluation'")
+    #print(f"Conectando a la base de datos {db} con colección 'evaluation'")
 
     return db[collection_name]

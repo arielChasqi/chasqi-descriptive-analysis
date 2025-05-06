@@ -2,13 +2,19 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 from bson import ObjectId
-from .mongo_client import get_collection
 from evaluation.services.departments_analysis import (
     group_employees_by_department,
     group_employees_by_cargo,
     group_evaluations_by_departmentId,
-    group_secctions_kpis
 )
+
+from evaluation.services.evaluations_analysis import (
+    group_secctions_kpis,
+    getEvaluation_real_time_one_evaluated
+) 
+
+from .mongo_client import get_collection
+
 
 def contar_documentos(request):
     tenant_id = request.headers.get('x-tenant-id')
@@ -129,10 +135,39 @@ def group_secctions_and_kpis(request):
         tenant_id = data.get('tenantId')
         evaluation_id = data.get('evaluationId')
 
-        if not tenant_id or evaluation_id:
+        if not tenant_id and not evaluation_id:
             return JsonResponse({"error": "Falta el parámetro tenantId o evaluation_id"}, status=400)
 
         response, error = group_secctions_kpis(tenant_id, evaluation_id)
+ 
+        if error:
+            return JsonResponse({"error": error}, status=404)
+
+        return JsonResponse(response, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+    
+
+@csrf_exempt
+def get_evaluation_realtime_one_evaluated(request):
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido, usa POST"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        tenant_id = data.get('tenantId')
+        evaluation_id = data.get('evaluationId')
+        employee_id = data.get('employeeId')
+        filter_range = data.get('filterRange')
+        start_date_str = data.get('startDateE')
+        end_date_str = data.get('endDateE')
+
+
+        if not tenant_id and not evaluation_id and not employee_id and not filter_range and not start_date_str and not end_date_str:
+            return JsonResponse({"error": "Falta algun parámetro para realizar una evaluación en tiempo real"}, status=400)
+
+        response, error = getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str)
  
         if error:
             return JsonResponse({"error": error}, status=404)

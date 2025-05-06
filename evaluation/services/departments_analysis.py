@@ -1,5 +1,7 @@
 from bson import ObjectId
 from evaluation.mongo_client import get_collection
+import logging
+logger = logging.getLogger(__name__)
 
 def group_employees_by_department(tenant_id):
     departments_collection = get_collection(tenant_id, 'metadatadepartments')
@@ -177,14 +179,4 @@ def group_evaluations_by_departmentId(tenant_id, department_id):
         "total_evaluaciones": len(resultado),
         "total_empleados": total,
         "resultado": resultado
-    }, None
-
-def group_secctions_kpis(tenant_id, evaluation_id):
-    evaluation_collection = get_collection(tenant_id, 'evaluation')
-    kpis_collection = get_collection(tenant_id, 'kpi')
-
-    evaluation = evaluation_collection.find_one({"_id": ObjectId(evaluation_id)})
-
-    return {
-        "resultado": "resultado"
     }, None
