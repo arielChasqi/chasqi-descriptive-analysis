@@ -1,6 +1,7 @@
 from datetime import datetime
 from bson import ObjectId
 import pytz
+from evaluation.services.kpi_calculator import get_kpi_evaluation
 from evaluation.mongo_client import get_collection
 from evaluation.utils.date_utils import calculate_evaluation_range
 
@@ -122,6 +123,7 @@ def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id,
             "Formula": 1,
             "Filtro_de_fecha": 1,
             "Filters": 1,
+            "Task": 1,
             "Dias_no_laborables": 1
         }
     )
@@ -136,12 +138,13 @@ def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id,
             "Campo_a_evaluar": k.get("Campo_a_evaluar"),
             "Filtro_de_fecha": k.get("Filtro_de_fecha", "Fecha_de_creacion"),
             "Filters": k.get("Filters", []),
+            "Task": k.get("Task", []),
             "Dias_no_laborables": k.get("Dias_no_laborables", [])
         }
         for k in kpis
     }
 
-
+    # Paso 5: Obtener los KPIs de cada seccion y calcular resultados
 
 
     return {
@@ -156,4 +159,128 @@ def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id,
         "kpis": kpi_map  # opcional: puedes devolverlo para debug
     }, None
 
+def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, end_date, kpi_map):
+    kpievaluationhistory_collection = get_collection(tenant_Id, 'kpievaluationhistory')
+
+    # Paso 1: Inicializar variables
+    notas_por_seccion = []
+    nota_final = 0
+
+    # Paso 2: Recorrer cada sección de la evaluación
+    for seccion in evaluation.get("Secciones", []):
+        detalles_kpis = []
+        nota_seccion = 0
+
+        #Separar KPIs de tipo evaluacion y de tipo métricas
+        kpis_tipo_evaluacion = []
+        kpis_tipo_metrics = []
+
+        #Recorrer cada KPI de la seccion
+        for kpi in seccion.get("KpisSeccion", []): 
+            kpi_id = str(kpi["KpiId"])
+            peso_kpi = kpi.get("Peso", 0)
+            label_id = str(kpi.get("Etiqueta")) if kpi.get("Etiqueta") else None
+            kpi_data = kpi_map.get(kpi_id)
+
+            if not kpi_data:
+                print(f"⚠️ KPI no encontrado: {kpi_id}")
+                continue
+            
+            #Separar por tipo de KPI
+            if kpi_data["Tipo_de_KPI"] in ["question", "dropdown", "static_metrics"]:
+                kpis_tipo_evaluacion.append({"kpi_id": kpi_id, "peso_kpi": peso_kpi, "label_id": label_id})
+            else:
+                kpis_tipo_metrics.append({"kpi_id": kpi_id, "peso_kpi": peso_kpi})
+
+        # Paso 3: Buscar notas en `KPIEvaluationHistory` para los KPIs de tipo evaluación
+        if kpis_tipo_evaluacion:
+            # Construir el pipeline de agregación
+            pipeline_match = {
+                "employeeId": ObjectId(colaborador_Id),
+                "$or": [
+                    {
+                        "kpiId": ObjectId(kpi["kpi_id"]),
+                        **({"labelId": ObjectId(kpi["label_id"])} if kpi.get("label_id") else {})
+                    }
+                    for kpi in kpis_tipo_evaluacion
+                ]
+            }
+
+            pipeline = [
+                {"$match": pipeline_match},
+                {"$project": {"_id": 0, "kpiId": 1, "labelId": 1, "Nota": 1}}
+            ]
+
+            # Ejecutar agregación para obtener las notas
+            notas_kpi = list(kpievaluationhistory_collection.aggregate(pipeline))
+
+            # Asignar notas a los KPIs
+            for kpi in kpis_tipo_evaluacion:
+                kpi_id = kpi["kpi_id"]
+                label_id = kpi.get("label_id")
+                peso_kpi = kpi["peso_kpi"]
+
+                # Buscar la nota correspondiente
+                nota_kpi_doc = next(
+                    (n for n in notas_kpi if str(n["kpiId"]) == kpi_id and
+                     (not label_id or str(n.get("labelId")) == label_id)), None)
+
+                # Si no se encuentra, la nota es 0
+                nota_kpi = nota_kpi_doc["Nota"] if nota_kpi_doc else 0
+                nota_ponderada = (nota_kpi * peso_kpi) / 100
+                nota_seccion += nota_ponderada
+
+                # Agregar detalle del KPI
+                detalles_kpis.append({
+                    "_id": kpi_id,
+                    "kpi": kpi_map.get(kpi_id, {}).get("Nombre", "Desconocido"),
+                    "peso": peso_kpi,
+                    "nota_kpi": round(nota_kpi, 2),
+                    "nota_ponderada": round(nota_ponderada, 2),
+                    "metricObjetivo": kpi_map.get(kpi_id, {}).get("Objetivo")
+                })
+
+         # Paso 4: Calcular KPIs de tipo métricas
+        if kpis_tipo_metrics:
+            for kpi in kpis_tipo_metrics:
+                kpi_data = kpi_map.get(kpi["kpi_id"])
+                task_id = kpi_data.get("Task", [{}])[0].get("id")
+                if not task_id:
+                    continue
+
+                # Llamar a la función que calcula el KPI (en vez de un servicio externo)
+                #kpi_result = get_kpi_evaluation(
+                #    task_id, kpi_data, tenant_id, colaborador_id, start_date, end_date
+                #)
+
+                # Agregar el resultado al cálculo de la sección
+                #detalles_kpis.append({
+                #    "_id": kpi["kpi_id"],
+                #    "kpi": kpi_data["Nombre"],
+                #    "peso": kpi["peso_kpi"],
+                #    "nota_kpi": round(kpi_result["kpiPercentage"], 2),
+                #    "nota_ponderada": round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2),
+                #    "metricObjetivo": kpi_result["targetSales"]
+                #})
+
+                # Acumulamos la nota ponderada en la sección
+                #nota_seccion += round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2)
+
+        # Paso 5: Finalizar la sección
+        notas_por_seccion.append({
+            "_id": str(seccion["_id"]),
+            "titulo_seccion": seccion.get("TituloSeccion", "Sin Título"),
+            "nota_seccion": round(nota_seccion, 2),
+            "notas_kpis": detalles_kpis
+        })
+
+        # Sumar la nota ponderada de la sección al total de la evaluación
+        nota_ponderada_seccion = (nota_seccion * seccion.get("PesoSeccion", 0)) / 100
+        nota_final += nota_ponderada_seccion
+
+    # Paso 6: Retornar los resultados
+    return {
+        "notas_por_seccion": notas_por_seccion,
+        "nota_final": round(nota_final, 2)
+    }
 
