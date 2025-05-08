@@ -2,6 +2,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 import json
 from bson import ObjectId
+
+from evaluation.evaluate_strategy.strategy import (
+    DepartmentBasedEvaluation,
+    EvaluationBasedEvaluation,
+    EmployeeBasedEvaluation,
+    EvaluationContext
+)
+  
 from evaluation.services.departments_analysis import (
     group_employees_by_department,
     group_employees_by_cargo,
@@ -14,7 +22,6 @@ from evaluation.services.evaluations_analysis import (
 ) 
 
 from .mongo_client import get_collection
-
 
 def contar_documentos(request):
     tenant_id = request.headers.get('x-tenant-id')
@@ -176,3 +183,26 @@ def get_evaluation_realtime_one_evaluated(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt  
+def evaluate(request):
+    data = json.loads(request.body)
+    tenant_id = data.get('tenantId')
+    evaluation_id = data.get('evaluationId')
+    employee_id = data.get('employeeId', None)
+    department_id = data.get('departmentId', None)
+
+    # Verifica si los datos llegaron correctamente
+    print(f"Tenant ID: {tenant_id}, Evaluation ID: {evaluation_id}, Employee ID: {employee_id}, Department ID: {department_id}")
+
+    if department_id:
+        strategy = DepartmentBasedEvaluation()
+    elif employee_id:
+        strategy = EmployeeBasedEvaluation()
+    else:
+        strategy = EvaluationBasedEvaluation()
+
+    context = EvaluationContext(strategy)
+    result = context.calculate(tenant_id, evaluation_id, employee_id, department_id)
+
+    return JsonResponse(result, safe=False)

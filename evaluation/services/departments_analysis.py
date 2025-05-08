@@ -106,7 +106,7 @@ def group_evaluations_by_departmentId(tenant_id, department_id):
     # Validar existencia del departamento
     departamento = departments_collection.find_one(
         {"_id": ObjectId(department_id)},
-        {"Nombre": 1}
+        {"Nombre": 1},
     )
     if not departamento:
         return None, "Departamento no encontrado"
@@ -180,3 +180,44 @@ def group_evaluations_by_departmentId(tenant_id, department_id):
         "total_empleados": total,
         "resultado": resultado
     }, None
+
+def get_employees_by_department(tenant_id, department_id):
+    departments_collection = get_collection(tenant_id, 'metadatadepartments')
+    employee_collection = get_collection(tenant_id, 'employee')
+    user_collection = get_collection(tenant_id, 'user')
+
+    # Validar existencia del departamento
+    departamento = departments_collection.find_one(
+        {"_id": ObjectId(department_id)},
+        {"Nombre": 1, "Cargos": 1}
+    )
+    if not departamento:
+        return None, "Departamento no encontrado"
+
+    dept_name = departamento["Nombre"]
+
+    # Usuarios activos
+    active_users = list(user_collection.find({"State": "activo"}, {"EmployeeId": 1}))
+    active_employee_ids = {u["EmployeeId"] for u in active_users if "EmployeeId" in u}
+
+    # Empleados activos filtrados por departamento y con evaluaciones
+    empleados = list(employee_collection.find(
+        {
+            "_id": {"$in": list(active_employee_ids)},
+            "Departamento": dept_name
+        },
+        {
+        "Evaluations": 1,
+        "Departamento": 1,
+        "Cargo": 1
+    }
+    ))
+
+    if not empleados:
+        return None, f"No hay empleados activos con evaluaciones en el departamento '{dept_name}'"
+
+    total = len(empleados)
+    logger.info("total %s", total)
+    logger.info("empleados %s", empleados)
+
+    return empleados

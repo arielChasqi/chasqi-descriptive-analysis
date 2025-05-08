@@ -61,6 +61,28 @@ def group_secctions_kpis(tenant_id, evaluation_id):
         "resultado": resultado
     }, None
 
+def calculate_evaluation_for_employees(tenant_id, evaluation_id, employees): 
+    logger.info("Estoy en calculate_evaluation_for_employee JAJAJA")
+    logger.info("tenant_id %s", tenant_id)
+    logger.info("evaluation_id %s", evaluation_id)
+    logger.info("employees %s", employees)
+
+    return "Hola" 
+
+def get_employees_by_evaluation(evaluation_id): 
+    logger.info("Estoy en get_employees_by_evaluation JAJAJA")
+    logger.info("department_id %s", evaluation_id)
+    employees = ["employee_1", "employee_2", "employee_3"]
+    return employees
+
+def calculate_evaluation_for_employee(tenant_id, evaluation_id, employee_id):
+    logger.info("Estoy en calculate_evaluation_for_employee JAJAJA")
+    logger.info("tenant_id %s", tenant_id)
+    logger.info("evaluation_id %s", evaluation_id)
+    logger.info("employee_id %s", employee_id)
+    employees = ["employee_1", "employee_2", "employee_3"]
+    return employees
+
 def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str):
     evaluation_collection = get_collection(tenant_id, 'evaluation')
     kpi_collection = get_collection(tenant_id, 'kpi')
