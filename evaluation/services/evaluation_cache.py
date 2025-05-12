@@ -17,7 +17,7 @@ def get_cached_or_fresh_evaluation(tenant_id, evaluation_id):
 
     evaluation = evaluation_collection.find_one(
         {"_id": ObjectId(evaluation_id)},
-        {"Nombre": 1, "Evaluados": 1, "Secciones": 1, "Rango_evaluacion": 1}
+        {"Nombre": 1, "Secciones": 1, "Rango_evaluacion": 1, "Dias_no_laborables": 1}
     )
     if not evaluation:
         return None, "Evaluación no encontrada" 
@@ -55,7 +55,7 @@ def get_cached_or_fresh_evaluation(tenant_id, evaluation_id):
             "Campo_a_evaluar": k.get("Campo_a_evaluar"),
             "Filtro_de_fecha": k.get("Filtro_de_fecha", "Fecha_de_creacion"),
             "Filters": k.get("Filters", []),
-            "Task": k.get("Task", []),
+            "Task": k.get("Task", [{}])[0].get("id") if k.get("Task") else None,
             "Dias_no_laborables": k.get("Dias_no_laborables", [])
         }
         for k in kpis
@@ -65,10 +65,21 @@ def get_cached_or_fresh_evaluation(tenant_id, evaluation_id):
     for seccion in evaluation.get("Secciones", []):
         for kpi in seccion.get("KpisSeccion", []):
             kpi_id_str = str(kpi["KpiId"])
-            kpi.update(kpi_map.get(kpi_id_str, {}))
+            kpi_data = kpi_map.get(kpi_id_str, {})
+            kpi.update(clean_kpi(kpi_data))
 
     # 5. Cachear en Redis
     redis_client.setex(key, 21600, json.dumps(evaluation, default=str))
     # 6. Devolver evaluación enriquecida
     return evaluation
 
+def clean_kpi(kpi: dict) -> dict:
+    result = {}
+    for k, v in kpi.items():
+        if v is None or v == []:
+            continue
+        if k == "Task" and isinstance(v, list) and len(v) > 0 and "id" in v[0]:
+            result[k] = v[0]["id"]
+        else:
+            result[k] = v
+    return result

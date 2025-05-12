@@ -16,10 +16,7 @@ from evaluation.services.departments_analysis import (
     group_evaluations_by_departmentId,
 )
 
-from evaluation.services.evaluations_analysis import (
-    group_secctions_kpis,
-    getEvaluation_real_time_one_evaluated
-) 
+from evaluation.services.evaluations_analysis import group_secctions_kpis
 
 from .mongo_client import get_collection
 
@@ -155,35 +152,6 @@ def group_secctions_and_kpis(request):
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
     
-
-@csrf_exempt
-def get_evaluation_realtime_one_evaluated(request):
-    if request.method != 'POST':
-        return JsonResponse({"error": "Método no permitido, usa POST"}, status=405)
-
-    try:
-        data = json.loads(request.body)
-        tenant_id = data.get('tenantId')
-        evaluation_id = data.get('evaluationId')
-        employee_id = data.get('employeeId')
-        filter_range = data.get('filterRange')
-        start_date_str = data.get('startDateE')
-        end_date_str = data.get('endDateE')
-
-
-        if not tenant_id and not evaluation_id and not employee_id and not filter_range and not start_date_str and not end_date_str:
-            return JsonResponse({"error": "Falta algun parámetro para realizar una evaluación en tiempo real"}, status=400)
-
-        response, error = getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str)
- 
-        if error:
-            return JsonResponse({"error": error}, status=404)
-
-        return JsonResponse(response, safe=False)
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
-
 @csrf_exempt  
 def evaluate(request):
     data = json.loads(request.body)
@@ -191,9 +159,12 @@ def evaluate(request):
     evaluation_id = data.get('evaluationId')
     employee_id = data.get('employeeId', None)
     department_id = data.get('departmentId', None)
+    filter_range = data.get('filterRange')
+    start_date_str = data.get('startDateE')
+    end_date_str = data.get('endDateE')
 
     # Verifica si los datos llegaron correctamente
-    print(f"Tenant ID: {tenant_id}, Evaluation ID: {evaluation_id}, Employee ID: {employee_id}, Department ID: {department_id}")
+    print(f"Tenant ID: {tenant_id}, Evaluation ID: {evaluation_id}, Employee ID: {employee_id}, Department ID: {department_id},Filter Range: {filter_range}, Start Date: {start_date_str}, End Date: {end_date_str}")
 
     if department_id:
         strategy = DepartmentBasedEvaluation()
@@ -203,6 +174,6 @@ def evaluate(request):
         strategy = EvaluationBasedEvaluation()
 
     context = EvaluationContext(strategy)
-    result = context.calculate(tenant_id, evaluation_id, employee_id, department_id)
+    result = context.calculate(tenant_id, filter_range, start_date_str, end_date_str, employee_id, evaluation_id, department_id)
 
     return JsonResponse(result, safe=False)

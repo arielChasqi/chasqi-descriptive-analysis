@@ -4,6 +4,8 @@ import pytz
 from evaluation.services.kpi_calculator import get_kpi_evaluation
 from evaluation.mongo_client import get_collection
 from evaluation.utils.date_utils import calculate_evaluation_range
+from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
+from evaluation.services.custom_performance import get_evaluation_range_by_percentage
 
 TIMEZONE = pytz.timezone("America/Guayaquil")
 
@@ -61,47 +63,14 @@ def group_secctions_kpis(tenant_id, evaluation_id):
         "resultado": resultado
     }, None
 
-def calculate_evaluation_for_employees(tenant_id, evaluation_id, employees): 
-    logger.info("Estoy en calculate_evaluation_for_employee JAJAJA")
-    logger.info("tenant_id %s", tenant_id)
-    logger.info("evaluation_id %s", evaluation_id)
-    logger.info("employees %s", employees)
+def calculate_evaluation_for_employees(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str):
 
-    return employees 
-
-def get_employees_by_evaluation(evaluation_id, tenant_id): 
-    evaluation_collection = get_collection(tenant_id, 'evaluation')
-    #Validar la existencia de la evaluacion
-    evaluation = evaluation_collection.find_one(
-        {"_id": ObjectId(evaluation_id)},
-        {"Evaluados": 1, "Secciones": 1, "Rango_evaluacion": 1}
-    )
+    #Paso 1. Obtener la evaluación cacheada o desde MongoDB
+    evaluation = get_cached_or_fresh_evaluation(tenant_id, evaluation_id)
 
     if not evaluation:
-        return None, "Evaluación no encontrada"
-
-    return evaluation
-
-def calculate_evaluation_for_employee(tenant_id, evaluation_id, employee_id):
-    logger.info("Estoy en calculate_evaluation_for_employee JAJAJA")
-    logger.info("tenant_id %s", tenant_id)
-    logger.info("evaluation_id %s", evaluation_id)
-    logger.info("employee_id %s", employee_id)
-    employees = ["employee_1", "employee_2", "employee_3"]
-    return employees
-
-def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str):
-    evaluation_collection = get_collection(tenant_id, 'evaluation')
-    kpi_collection = get_collection(tenant_id, 'kpi')
-    employee_collection = get_collection(tenant_id, 'employee')
-
-    # Paso 0: Obtener evaluación
-    evaluation = evaluation_collection.find_one({"_id": ObjectId(evaluation_id)})
-    if not evaluation:
-        return None, "Evaluación no encontrada"
-
-    dias_no_laborables = evaluation.get("Dias_no_laborables", [])
-
+        return None, "No se encontró la evaluación con el ID proporcionado."
+    
     # Paso 1: Calcular fechas según filtro
     if filter_range == "rango_de_fechas":
         try:
@@ -113,17 +82,15 @@ def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id,
         except ValueError:
             return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
     else:
-        rango = calculate_evaluation_range(filter_range, dias_no_laborables)
+        rango = calculate_evaluation_range(filter_range, evaluation['Dias_no_laborables'])
         start_start_date = rango["start"]
         end_start_date = rango["end"]
 
-    # Paso 2: Obtener el _id y paràmetros necesarios del empleado
-    employee = employee_collection.find_one({"_id": ObjectId(employee_id)}, {"Nombres": 1, "Apellidos": 1, "Departamento": 1, "Area": 1, "Fecha_de_inicio": 1})
-    
-    if not employee:
-        return None, "Evaluado no encontrado"
-    
-   # Paso 3: Construir estructura de resultado
+    # Paso 2: Obtener el _id y parametros necesarios del empleado
+    employee_collection = get_collection(tenant_id, 'employee')
+    employee = employee_collection.find_one({"_id": ObjectId(employee_id)}, {"Nombres": 1, "Apellidos": 1, "Departamento": 1, "Cargo": 1, "Area": 1, "Fecha_de_inicio": 1})
+
+    # Paso 3: Construir estructura de resultado
     resultado = {
         "_id": str(employee["_id"]),
         "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
@@ -135,61 +102,36 @@ def getEvaluation_real_time_one_evaluated(tenant_id, evaluation_id, employee_id,
         "notas_por_seccion": []
     }
 
-    # Paso 4: Obtener mapa de KPIs usados en la evaluación
-    kpi_ids = []
-    for seccion in evaluation.get("Secciones", []):
-        kpi_ids.extend([k["KpiId"] for k in seccion.get("KpisSeccion", [])])
+    if not employee:
+        return None, "No se encontró el colaborador a evaluar con el ID proporcionado."
 
-    unique_kpi_ids = list(set(kpi_ids))
-    kpis = kpi_collection.find(
-        {"_id": {"$in": unique_kpi_ids}},
-        {
-            "Nombre": 1,
-            "Tipo_de_KPI": 1,
-            "Objetivo": 1,
-            "Unidad_de_tiempo": 1,
-            "Campo_a_evaluar": 1,
-            "Formula": 1,
-            "Filtro_de_fecha": 1,
-            "Filters": 1,
-            "Task": 1,
-            "Dias_no_laborables": 1
-        }
+    # 🎯 Nuevo paso: calcular KPIs desde evaluación
+    resultado_kpis = get_kpis_from_evaluation(
+        evaluation,
+        tenant_id,
+        employee_id,
+        start_start_date,
+        end_start_date,
     )
 
-    kpi_map = {
-        str(k["_id"]): {
-            "_id": str(k["_id"]),
-            "Nombre": k.get("Nombre", ""),
-            "Tipo_de_KPI": k.get("Tipo_de_KPI", ""),
-            "Objetivo": k.get("Objetivo"),
-            "Formula": k.get("Formula"),
-            "Campo_a_evaluar": k.get("Campo_a_evaluar"),
-            "Filtro_de_fecha": k.get("Filtro_de_fecha", "Fecha_de_creacion"),
-            "Filters": k.get("Filters", []),
-            "Task": k.get("Task", []),
-            "Dias_no_laborables": k.get("Dias_no_laborables", [])
-        }
-        for k in kpis
-    }
+    # Actualizar estructura resultado
+    resultado["nota_final"] = resultado_kpis["nota_final"]
+    resultado["notas_por_seccion"] = resultado_kpis["notas_por_seccion"]
 
-    # Paso 5: Obtener los KPIs de cada seccion y calcular resultados
+     # Paso Final: asignar desempeño y color
+    try:
+        metadata = get_evaluation_range_by_percentage(resultado["nota_final"], tenant_id)
+        resultado["desempenio"] = metadata.get("title", "Sin clasificación") if metadata else "Sin clasificación"
+        resultado["color"] = metadata.get("color", "#808080") if metadata else "#808080"
+    except (TypeError, KeyError, AttributeError) as e:
+        logger.warning("Error obteniendo desempeño: %s", str(e))
+        resultado["desempenio"] = "Error"
+        resultado["color"] = "#FF0000"
 
+    return resultado
 
-    return {
-        "fecha_inicio": start_start_date.isoformat(),
-        "fecha_fin": end_start_date.isoformat(),
-        "dias_no_laborables": dias_no_laborables,
-        "evaluacion": {
-            "_id": str(evaluation["_id"]),
-            "Nombre": evaluation.get("Nombre", "Sin nombre")
-        },
-        "evaluado": resultado,
-        "kpis": kpi_map  # opcional: puedes devolverlo para debug
-    }, None
-
-def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, end_date, kpi_map):
-    kpievaluationhistory_collection = get_collection(tenant_Id, 'kpievaluationhistory')
+def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, end_date):
+    kpievaluationhistory_collection = get_collection(tenant_id, 'kpievaluationhistory')
 
     # Paso 1: Inicializar variables
     notas_por_seccion = []
@@ -199,7 +141,6 @@ def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, 
     for seccion in evaluation.get("Secciones", []):
         detalles_kpis = []
         nota_seccion = 0
-
         #Separar KPIs de tipo evaluacion y de tipo métricas
         kpis_tipo_evaluacion = []
         kpis_tipo_metrics = []
@@ -209,23 +150,27 @@ def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, 
             kpi_id = str(kpi["KpiId"])
             peso_kpi = kpi.get("Peso", 0)
             label_id = str(kpi.get("Etiqueta")) if kpi.get("Etiqueta") else None
-            kpi_data = kpi_map.get(kpi_id)
+            tipo_kpi = kpi.get("Tipo_de_KPI")
 
-            if not kpi_data:
-                print(f"⚠️ KPI no encontrado: {kpi_id}")
-                continue
-            
-            #Separar por tipo de KPI
-            if kpi_data["Tipo_de_KPI"] in ["question", "dropdown", "static_metrics"]:
-                kpis_tipo_evaluacion.append({"kpi_id": kpi_id, "peso_kpi": peso_kpi, "label_id": label_id})
+            if tipo_kpi in ["question", "dropdown", "static_metrics"]:
+                kpis_tipo_evaluacion.append({
+                    "kpi_id": kpi_id,
+                    "peso_kpi": peso_kpi,
+                    "label_id": label_id,
+                    "kpi_info": kpi
+                })
             else:
-                kpis_tipo_metrics.append({"kpi_id": kpi_id, "peso_kpi": peso_kpi})
+                kpis_tipo_metrics.append({
+                    "kpi_id": kpi_id,
+                    "peso_kpi": peso_kpi,
+                    "kpi_info": kpi
+                })
 
         # Paso 3: Buscar notas en `KPIEvaluationHistory` para los KPIs de tipo evaluación
         if kpis_tipo_evaluacion:
             # Construir el pipeline de agregación
             pipeline_match = {
-                "employeeId": ObjectId(colaborador_Id),
+                "employeeId": ObjectId(colaborador_id),
                 "$or": [
                     {
                         "kpiId": ObjectId(kpi["kpi_id"]),
@@ -248,6 +193,7 @@ def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, 
                 kpi_id = kpi["kpi_id"]
                 label_id = kpi.get("label_id")
                 peso_kpi = kpi["peso_kpi"]
+                info = kpi["kpi_info"]
 
                 # Buscar la nota correspondiente
                 nota_kpi_doc = next(
@@ -262,54 +208,69 @@ def get_kpis_from_evaluation(evaluation, tenant_Id, colaborador_Id, start_date, 
                 # Agregar detalle del KPI
                 detalles_kpis.append({
                     "_id": kpi_id,
-                    "kpi": kpi_map.get(kpi_id, {}).get("Nombre", "Desconocido"),
+                    "kpi": info.get("Nombre", "Desconocido"),
                     "peso": peso_kpi,
                     "nota_kpi": round(nota_kpi, 2),
                     "nota_ponderada": round(nota_ponderada, 2),
-                    "metricObjetivo": kpi_map.get(kpi_id, {}).get("Objetivo")
+                    "metricObjetivo": info.get("Objetivo")
                 })
 
-         # Paso 4: Calcular KPIs de tipo métricas
+        # Paso 4: Calcular KPIs de tipo métricas
         if kpis_tipo_metrics:
             for kpi in kpis_tipo_metrics:
-                kpi_data = kpi_map.get(kpi["kpi_id"])
-                task_id = kpi_data.get("Task", [{}])[0].get("id")
+                info = kpi["kpi_info"]
+                task_id = info.get("Task")
                 if not task_id:
                     continue
 
-                # Llamar a la función que calcula el KPI (en vez de un servicio externo)
-                #kpi_result = get_kpi_evaluation(
-                #    task_id, kpi_data, tenant_id, colaborador_id, start_date, end_date
-                #)
+                kpi_result = get_kpi_evaluation(
+                    task_id, info, tenant_id, colaborador_id, start_date, end_date
+                )
 
-                # Agregar el resultado al cálculo de la sección
-                #detalles_kpis.append({
-                #    "_id": kpi["kpi_id"],
-                #    "kpi": kpi_data["Nombre"],
-                #    "peso": kpi["peso_kpi"],
-                #    "nota_kpi": round(kpi_result["kpiPercentage"], 2),
-                #    "nota_ponderada": round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2),
-                #    "metricObjetivo": kpi_result["targetSales"]
-                #})
+                detalles_kpis.append({
+                    "_id": kpi["kpi_id"],
+                    "kpi": info.get("Nombre", "Desconocido"),
+                    "peso": kpi["peso_kpi"],
+                    "nota_kpi": round(kpi_result["kpiPercentage"], 2),
+                    "nota_ponderada": round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2),
+                    "metricObjetivo": kpi_result.get("targetSales")
+                })
 
-                # Acumulamos la nota ponderada en la sección
-                #nota_seccion += round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2)
+                nota_seccion += round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2)
+
+        # Sumar la nota ponderada de la sección al total de la evaluación
+        nota_ponderada_seccion = (nota_seccion * seccion.get("PesoSeccion", 0)) / 100
+        nota_final += nota_ponderada_seccion
 
         # Paso 5: Finalizar la sección
         notas_por_seccion.append({
             "_id": str(seccion["_id"]),
             "titulo_seccion": seccion.get("TituloSeccion", "Sin Título"),
             "nota_seccion": round(nota_seccion, 2),
+            "nota_ponderada_seccion": round(nota_ponderada_seccion, 2),
             "notas_kpis": detalles_kpis
         })
-
-        # Sumar la nota ponderada de la sección al total de la evaluación
-        nota_ponderada_seccion = (nota_seccion * seccion.get("PesoSeccion", 0)) / 100
-        nota_final += nota_ponderada_seccion
 
     # Paso 6: Retornar los resultados
     return {
         "notas_por_seccion": notas_por_seccion,
         "nota_final": round(nota_final, 2)
     }
+
+
+def get_employees_by_evaluation(evaluation_id, tenant_id): 
+    evaluation_collection = get_collection(tenant_id, 'evaluation')
+    #Validar la existencia de la evaluacion
+    evaluation = evaluation_collection.find_one(
+        {"_id": ObjectId(evaluation_id)},
+        {"Evaluados": 1, "Secciones": 1, "Rango_evaluacion": 1}
+    )
+
+    if not evaluation:
+        return None, "Evaluación no encontrada"
+
+    return evaluation
+
+
+
 
