@@ -67,13 +67,20 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, employees):
     logger.info("evaluation_id %s", evaluation_id)
     logger.info("employees %s", employees)
 
-    return "Hola" 
+    return employees 
 
-def get_employees_by_evaluation(evaluation_id): 
-    logger.info("Estoy en get_employees_by_evaluation JAJAJA")
-    logger.info("department_id %s", evaluation_id)
-    employees = ["employee_1", "employee_2", "employee_3"]
-    return employees
+def get_employees_by_evaluation(evaluation_id, tenant_id): 
+    evaluation_collection = get_collection(tenant_id, 'evaluation')
+    #Validar la existencia de la evaluacion
+    evaluation = evaluation_collection.find_one(
+        {"_id": ObjectId(evaluation_id)},
+        {"Evaluados": 1, "Secciones": 1, "Rango_evaluacion": 1}
+    )
+
+    if not evaluation:
+        return None, "Evaluación no encontrada"
+
+    return evaluation
 
 def calculate_evaluation_for_employee(tenant_id, evaluation_id, employee_id):
     logger.info("Estoy en calculate_evaluation_for_employee JAJAJA")

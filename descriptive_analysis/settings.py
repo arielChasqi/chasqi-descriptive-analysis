@@ -19,6 +19,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_CONNECTION_STRING = config('DB_CONNECTION_STRING')
 PORT = config('PORT', default=3015, cast=int)
 
+REDIS_HOST = config('REDIS_HOST', default='localhost')
+REDIS_PORT = config('REDIS_PORT', cast=int, default=6379)
+REDIS_DB = config('REDIS_DB', cast=int, default=0)
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 

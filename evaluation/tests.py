@@ -1,10 +1,12 @@
 from django.test import TestCase
 from datetime import datetime
 import pytz
+import json
 # Create your tests here.
 from evaluation.services.kpi_calculator import get_kpi_evaluation
+from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
 from .services.custom_performance import get_evaluation_range_by_percentage
-
+from evaluation.utils.redis_client import redis_client
 
 class CustomPerformanceTestCase(TestCase):
     def test_get_evaluation_range_by_percentage(self):
@@ -54,4 +56,33 @@ class KpiCalculatorTestCase(TestCase):
         self.assertEqual(result["daysConsidered"], 23)
         self.assertEqual(result["targetSales"], 575)
         self.assertEqual(result["nonConsideredDaysCount"], 8)
+        
+class EvaluationCacheIntegrationTest(TestCase):
+    def setUp(self):
+        self.tenant_id = "chasqi"
+        self.evaluation_id = "67b772bfaf33bc64b4d5394c"
+
+        #Limpia la cache antes de cada prueba
+        self.redis_key = f"tenant:{self.tenant_id}:evaluation:{self.evaluation_id}"
+        redis_client.delete(self.redis_key)
+    
+    def test_get_evaluation_and_cache_it(self):
+        #Primera vez: trae de MongoDB y guarda en Redis
+        evaluation = get_cached_or_fresh_evaluation(self.tenant_id, self.evaluation_id)
+        self.assertIsInstance(evaluation, dict)
+        self.assertIn("Secciones", evaluation)
+
+        #Asegura que las secciones tienen KPIs enriquecidos
+        for seccion in evaluation["Secciones"]:
+            for kpi in seccion.get("KpisSeccion", []):
+                self.assertIn("Nombre", kpi)
+                self.assertIn("Tipo_de_KPI", kpi)
+                self.assertIn("Task", kpi)
+        
+        #Segunda vez: debe recuperarlo desde Redis
+        cached = redis_client.get(self.redis_key)
+        self.assertIsNotNone(cached)
+
+        loaded = json.loads(cached)
+        self.assertEqual(loaded["Nombre"], evaluation["Nombre"])
         

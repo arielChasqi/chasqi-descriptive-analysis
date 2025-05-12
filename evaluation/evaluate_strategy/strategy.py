@@ -20,7 +20,7 @@ class EvaluationBasedEvaluation(EvaluationCalculationStrategy):
     def calculate(self, tenant_id, evaluation_id, employee_id=None, department_id=None):
         print("Using EvaluationBasedEvaluation Strategy")
         # Lógica para recuperar empleados asignados a la evaluación y calcular evaluación
-        employees = get_employees_by_evaluation(evaluation_id)
+        employees = get_employees_by_evaluation(evaluation_id, tenant_id)
         return calculate_evaluation_for_employees(tenant_id, evaluation_id, employees)
 
 

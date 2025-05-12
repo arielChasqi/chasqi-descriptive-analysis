@@ -207,7 +207,7 @@ def get_employees_by_department(tenant_id, department_id):
             "Departamento": dept_name
         },
         {
-        "Evaluations": 1,
+        "Evaluations": {"$slice": 1},
         "Departamento": 1,
         "Cargo": 1
     }
