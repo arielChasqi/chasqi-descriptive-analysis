@@ -62,6 +62,8 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
 
     task_logs_collection = get_collection(tenant_id, 'tasklog')
 
+    logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
+
     logger.info("kpi_data: %s", kpi_data)
     logger.info("task_id: %s", task_id)
     logger.info("tenant_id: %s", tenant_id)
@@ -75,7 +77,18 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
         formula = kpi_data["Formula"]
         target = float(kpi_data.get("Objetivo", 0))
         unit_time = float(kpi_data.get("Unidad_de_tiempo", 1))
-        excluded_days = kpi_data.get("Dias_no_laborales", [1, 7])
+
+        raw_excluded_days = kpi_data.get("Dias_no_laborables", ["Saturday", "Sunday"])
+        day_name_to_index = {
+            "Monday": 0,
+            "Tuesday": 1,
+            "Wednesday": 2,
+            "Thursday": 3,
+            "Friday": 4,
+            "Saturday": 5,
+            "Sunday": 6
+        }
+        excluded_days = [day_name_to_index[d] for d in raw_excluded_days if d in day_name_to_index]
         # Verifica si "Filters" existe y tiene elementos
         if "Filters" in kpi_data and kpi_data["Filters"]:
             dynamic_filters = {f["key"]: f["value"] for f in kpi_data["Filters"] if "key" in f and "value" in f}
@@ -146,14 +159,14 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
     kpi_percentage = (result_value / target_sales * 100) if target_sales else 0
     rounded_kpi_percentage = round(kpi_percentage, 2)
 
-    logger.info("<------------------Resultados-------------------->: %s")
+    logger.info("<------------------Resultados----------------------------------------------------------->: %s")
     logger.info("rounded_kpi_percentage: %s", rounded_kpi_percentage)
     logger.info("result_value: %s", result_value)
     logger.info("days_considered: %s", days_considered)
     logger.info("target_sales: %s", target_sales)
     logger.info("non_considered_days: %s", non_considered_days)
 
-    logger.info("<---------------------------------------------------->: %s")
+    logger.info("<-----------------Finaliza la evaluación de un KPI ------------------------------------------>: %s")
 
     return {
         "kpiPercentage": rounded_kpi_percentage,
