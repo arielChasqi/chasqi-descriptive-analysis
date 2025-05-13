@@ -2,11 +2,13 @@ from django.test import TestCase
 from datetime import datetime
 import pytz
 import json
+import time
 # Create your tests here.
 from evaluation.services.kpi_calculator import get_kpi_evaluation
 from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
-from .services.custom_performance import get_evaluation_range_by_percentage
 from evaluation.utils.redis_client import redis_client
+from .services.custom_performance import get_evaluation_range_by_percentage
+from .services.evaluations_analysis import calculate_evaluation_for_employees
 
 class CustomPerformanceTestCase(TestCase):
     def test_get_evaluation_range_by_percentage(self):
@@ -86,3 +88,45 @@ class EvaluationCacheIntegrationTest(TestCase):
         loaded = json.loads(cached)
         self.assertEqual(loaded["Nombre"], evaluation["Nombre"])
         
+
+class PerformanceTestCase(TestCase):
+    def test_performance(self):
+        # Datos de ejemplo para la prueba (puedes ajustarlos según tus necesidades)
+        tenant_id = 'chasqi'
+        evaluation_id = '67b772bfaf33bc64b4d5394c'
+        employee_id = '67b61998441df990982006fa'
+        start_date = '2025-01-01'
+        end_date = '2025-03-31'
+        filter_range = 'rango_de_fechas'
+
+        execution_times = []
+
+        for _ in range(10):  # Ejecutar 10 veces para obtener un promedio
+            start_time = time.time()
+            
+            # Llamada a la función que quieres medir el rendimiento
+            result = calculate_evaluation_for_employees(
+                tenant_id,
+                evaluation_id,
+                employee_id,
+                filter_range,
+                start_date,
+                end_date
+            )
+            
+            end_time = time.time()
+            execution_time = end_time - start_time
+            execution_times.append(execution_time)
+
+        # Calcula el promedio del tiempo de ejecución
+        average_time = sum(execution_times) / len(execution_times)
+
+        print(f"Tiempo promedio de ejecución: {average_time:.4f} segundos")
+        
+        # Verifica que el tiempo de ejecución esté por debajo de un umbral razonable (ajústalo a tus necesidades)
+        self.assertLess(average_time, 2, "El tiempo de ejecución es demasiado alto")  # Ejemplo de umbral de 2 segundos
+
+        # Asegurarse de que se obtienen resultados válidos
+        self.assertIsInstance(result, dict)
+        self.assertIn('notas_por_seccion', result)
+        self.assertIn('nota_final', result)

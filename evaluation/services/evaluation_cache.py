@@ -17,7 +17,7 @@ def get_cached_or_fresh_evaluation(tenant_id, evaluation_id):
 
     evaluation = evaluation_collection.find_one(
         {"_id": ObjectId(evaluation_id)},
-        {"Nombre": 1, "Secciones": 1, "Rango_evaluacion": 1, "Dias_no_laborables": 1}
+        {"Nombre": 1, "Evaluados": 1, "Secciones": 1, "Rango_evaluacion": 1, "Dias_no_laborables": 1}
     )
     if not evaluation:
         return None, "Evaluación no encontrada" 
