@@ -66,6 +66,129 @@ def group_secctions_kpis(tenant_id, evaluation_id):
         "resultado": resultado
     }, None
 
+#<-------------------------------------------METHOD TO GET DEPARTMENT EVALUATION----------------------------------------------------------------->
+
+def calculate_evaluation_for_department(tenant_id, employees, filter_range, start_date_str, end_date_str):
+
+    evaluations = []  # Lista para almacenar los resultados
+    total_score = 0  # Para calcular el promedio del departamento
+    total_employees = len(employees)  # Número total de empleados
+    employees_by_position = defaultdict(list)  # Diccionario para agrupar empleados por cargo
+
+     # Paso 1: Calcular fechas según filtro (para todos los empleados si es "rango_de_fechas")
+    if filter_range == "rango_de_fechas":
+        try:
+            start_start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+            start_start_date = TIMEZONE.localize(start_start_date).replace(hour=0, minute=0, second=0).astimezone(pytz.utc)
+
+            end_start_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+            end_start_date = TIMEZONE.localize(end_start_date).replace(hour=23, minute=59, second=59).astimezone(pytz.utc)
+        except ValueError:
+            return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
+    else:
+        start_start_date, end_start_date = None, None  # Si no es "rango_de_fechas", cada empleado tiene su propio rango
+
+    # Paso 2: Usar ThreadPoolExecutor para paralelizar el cálculo para múltiples empleados
+    with ThreadPoolExecutor() as executor:
+        # Paralelizamos el cálculo de evaluación de todos los empleados
+        resultados = list(executor.map(
+            lambda employee: calculate_single_employee_evaluation_department(
+                tenant_id, employee, employee, filter_range, start_start_date, end_start_date
+            ),
+            employees  # Lista de empleados
+        ))
+
+     # Paso 3: Procesamos los resultados
+    for resultado in resultados:
+        evaluations.append(resultado)
+        total_score += resultado["nota_final"]
+
+        # Agrupamos empleados por cargo
+        employees_by_position[resultado["cargo"]].append(resultado)
+
+    # Paso 4: Calcular el promedio de notas para cada cargo
+    average_by_position = {}
+    for position, employees_in_position in employees_by_position.items():
+        total_position_score = sum([employee["nota_final"] for employee in employees_in_position])
+        average_by_position[position] = total_position_score / len(employees_in_position)
+
+    # Paso 5: Calcular el promedio general del departamento
+    department_average = total_score / total_employees if total_employees else 0
+
+    # Paso 6: Crear el objeto con el resultado final
+    department_result = {
+        "promedio_departamento": department_average,
+        "total_empleados": total_employees,
+        "empleados_por_cargo": {
+            position: {
+                "numero_empleados": len(employees_in_position),
+                "promedio_nota":  round(average_by_position[position], 2)
+            }
+            for position, employees_in_position in employees_by_position.items()
+        },
+        "evaluaciones_empleados": evaluations
+    }
+
+    # Paso 7: Retornar el resultado del departamento
+    return department_result
+
+def calculate_single_employee_evaluation_department(tenant_id, evaluation_id, employee, filter_range, start_date_str, end_date_str):
+
+    # Paso 1: Construir estructura de resultado predeterminado
+    resultado = {
+        "_id": str(employee["_id"]),
+        "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
+        "departamento": employee.get("Departamento", "No asignado"),
+        "cargo": employee.get("Cargo", "No asignado"),
+        "nota_final": 0,
+        "desempenio": "",
+        "color": "",
+        "notas_por_seccion": []
+    }
+
+    # Verificamos si el empleado tiene evaluaciones
+    if not employee.get("Evaluations"):
+        # Si no tiene evaluaciones, devolvemos un resultado predeterminado
+        return resultado
+    
+    # Paso 1. Obtener la evaluación cacheada o desde MongoDB
+    evaluation_id = employee["Evaluations"][0]  # Usamos la primera evaluación
+    evaluation = get_cached_or_fresh_evaluation(tenant_id, evaluation_id)
+
+    if not evaluation:
+        return None, "No se encontró la evaluación con el ID proporcionado."
+
+    # Paso 2: Calcular fechas según filtro
+    if filter_range != "rango_de_fechas":
+        rango = calculate_evaluation_range(filter_range, evaluation['Dias_no_laborables'])
+        start_date_str = rango["start"]
+        end_date_str = rango["end"]
+
+    # 🎯 Nuevo paso: calcular KPIs desde evaluación
+    resultado_kpis = get_kpis_from_evaluation(
+        evaluation,
+        tenant_id,
+        employee["_id"],
+        start_date_str,
+        end_date_str,
+    )
+
+    # Actualizar estructura resultado
+    resultado["nota_final"] = resultado_kpis["nota_final"]
+    resultado["notas_por_seccion"] = resultado_kpis["notas_por_seccion"]
+
+     # Paso Final: asignar desempeño y color
+    try:
+        metadata = get_evaluation_range_by_percentage(resultado["nota_final"], tenant_id)
+        resultado["desempenio"] = metadata.get("title", "Sin clasificación") if metadata else "Sin clasificación"
+        resultado["color"] = metadata.get("color", "#808080") if metadata else "#808080"
+    except (TypeError, KeyError, AttributeError) as e:
+        logger.warning("Error obteniendo desempeño: %s", str(e))
+        resultado["desempenio"] = "Error"
+        resultado["color"] = "#FF0000"
+
+    return resultado
+
 #<-------------------------------------------METHOD TO GET EVALUATION COLLABORATORS-------------------------------------------------------------->
 
 def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, start_date_str, end_date_str):
