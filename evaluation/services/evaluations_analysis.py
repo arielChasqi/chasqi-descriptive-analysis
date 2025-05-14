@@ -623,6 +623,7 @@ def calculate_kpi_metric(kpi, tenant_id, colaborador_id, start_date, end_date):
         "peso": kpi["peso_kpi"],
         "nota_kpi": round(kpi_result["kpiPercentage"], 2),
         "nota_ponderada": round(kpi_result["kpiPercentage"] * kpi["peso_kpi"] / 100, 2),
+        "registros_totales": kpi_result["totalCount"],
         "metricObjetivo": kpi_result.get("targetSales")
     }
 
