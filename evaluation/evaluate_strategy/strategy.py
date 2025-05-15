@@ -29,7 +29,6 @@ class EmployeeBasedEvaluation(EvaluationCalculationStrategy):
         # Lógica para calcular la evaluación para un solo empleado
         return calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, filter_range, start_date_str, end_date_str)
 
-
 class EvaluationContext:
     def __init__(self, strategy: EvaluationCalculationStrategy):
         self._strategy = strategy

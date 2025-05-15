@@ -16,12 +16,19 @@ from decouple import config
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+#Database connection
 DB_CONNECTION_STRING = config('DB_CONNECTION_STRING')
 PORT = config('PORT', default=3015, cast=int)
 
+#Temporal Database connection
 REDIS_HOST = config('REDIS_HOST', default='localhost')
 REDIS_PORT = config('REDIS_PORT', cast=int, default=6379)
 REDIS_DB = config('REDIS_DB', cast=int, default=0)
+
+#Params to emit events in project
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -32,7 +39,7 @@ SECRET_KEY = 'django-insecure-1re7xq#9rd3=5ib%)ga_p6h^g7^5hh9!$9+k7a5d3aw-*3m-co
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['61b6-2800-bf0-177-1249-91dd-36d8-adff-4d0e.ngrok-free.app', 'localhost']
 
 
 # Application definition

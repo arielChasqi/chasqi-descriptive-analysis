@@ -177,3 +177,17 @@ def evaluate(request):
     result = context.calculate(tenant_id, filter_range, start_date_str, end_date_str, employee_id, evaluation_id, department_id)
 
     return JsonResponse(result, safe=False)
+
+@csrf_exempt  # Para evitar error CSRF con llamadas externas
+def recibir_tasklog_trigger(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        print("✅ Trigger recibido:", data)
+
+        # Acceder a headers
+        tenant = request.headers.get('x-tenant-id')
+        auth = request.headers.get('authorization')
+        print(f"Tenant: {tenant} | Auth: {auth}")
+
+        return JsonResponse({"status": "ok"})
+    return JsonResponse({"error": "Método no permitido"}, status=405)

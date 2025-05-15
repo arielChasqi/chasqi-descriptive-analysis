@@ -8,13 +8,30 @@ from evaluation.mongo_client import get_collection
 from evaluation.utils.date_utils import calculate_evaluation_range
 from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
 from evaluation.services.custom_performance import get_evaluation_range_by_percentage
-
+from evaluation.tasks import save_employee_evaluation_task
 
 TIMEZONE = pytz.timezone("America/Guayaquil")
 
 import logging
 logger = logging.getLogger(__name__)
 
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
+def search_evaluation_history(data):
+     # 1. Intentar buscar evaluación guardada
+    collection = get_collection(data.tenant_id, "evaluationhistory")
+    doc = collection.find_one({
+        "employee_id": data.employee_id,
+        "evaluacion_id": data.evaluation_id,
+        "filter_name": data.filter_range,
+        "start_date": data.start_date,
+        "end_date": data.end_date
+    })
+    
+    if doc:
+        doc["_id"] = str(doc["_id"])  # Por si necesitas serializar
+        return doc
+
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
 def group_secctions_kpis(tenant_id, evaluation_id):
     evaluation_collection = get_collection(tenant_id, 'evaluation')
     kpis_collection = get_collection(tenant_id, 'kpi')
@@ -65,6 +82,28 @@ def group_secctions_kpis(tenant_id, evaluation_id):
     return {
         "resultado": resultado
     }, None
+
+
+#<--------------------------------------------METHOD TO CALCULATE DATE RANGE--------------------------------------------------------------------->
+def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_days_evaluation):
+    # Paso 1: Calcular fechas según filtro
+    if filter_range == "rango_de_fechas":
+        try:
+            start_start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+            start_start_date = TIMEZONE.localize(start_start_date).replace(hour=0, minute=0, second=0).astimezone(pytz.utc)
+
+            end_start_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+            end_start_date = TIMEZONE.localize(end_start_date).replace(hour=23, minute=59, second=59).astimezone(pytz.utc)
+
+            return start_start_date, end_start_date
+        
+        except ValueError:
+            return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
+    else:
+        rango = calculate_evaluation_range(filter_range, non_working_days_evaluation)
+        start_start_date = rango["start"]
+        end_start_date = rango["end"]
+        return start_start_date, end_start_date
 
 #<-------------------------------------------METHOD TO GET DEPARTMENT EVALUATION----------------------------------------------------------------->
 
@@ -194,39 +233,28 @@ def calculate_single_employee_evaluation_department(tenant_id, evaluation_id, em
 def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, start_date_str, end_date_str):
     # Paso 1: Inicializar una lista para los resultados
     resultados = []
-
     evaluation = get_cached_or_fresh_evaluation(tenant_id, evaluation_id)
 
     # Extraemos la lista de empleados evaluados directamente de la evaluación cacheada
     evaluados = evaluation.get("Evaluados", [])
 
-     # Si no hay empleados evaluados, retornar un mensaje de error o lista vacía
+    # Si no hay empleados evaluados, retornar un mensaje de error o lista vacía
     if not evaluados:
         logger.error("No se encontraron empleados para evaluar en esta evaluación.")
         return {"error": "No se encontraron empleados para evaluar."}
 
     logger.info("Empleados a evaluar: %s", evaluados)
 
-    # Paso 1: Calcular fechas según filtro (solo se realiza una vez)
-    if filter_range == "rango_de_fechas":
-        try:
-            start_start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-            start_start_date = TIMEZONE.localize(start_start_date).replace(hour=0, minute=0, second=0).astimezone(pytz.utc)
-
-            end_start_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-            end_start_date = TIMEZONE.localize(end_start_date).replace(hour=23, minute=59, second=59).astimezone(pytz.utc)
-        except ValueError:
-            return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
-    else:
-        rango = calculate_evaluation_range(filter_range, evaluation['Dias_no_laborables'])
-        start_start_date = rango["start"]
-        end_start_date = rango["end"]
+    # Paso 2: Calcular fechas
+    start_start_date, end_start_date = define_date_ranges(
+        filter_range, start_date_str, end_date_str, evaluation['Dias_no_laborables']
+    )
 
     # Paso 2: Usar ThreadPoolExecutor para paralelizar el cálculo para múltiples empleados
     with ThreadPoolExecutor() as executor:
         resultados = list(executor.map(
             lambda employee: calculate_employee_evaluation(
-                tenant_id, evaluation, employee, start_start_date, end_start_date),
+                tenant_id, evaluation, employee, filter_range, start_start_date, end_start_date),
             evaluados  # Ahora estamos usando la lista de empleados directamente
         ))
 
@@ -261,8 +289,28 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, s
         "promedio_por_seccion": promedio_por_seccion  # Promedio por cada sección
     }
 
-def calculate_employee_evaluation(tenant_id, evaluation, employee_id, start_start_date, end_start_date):
-    # Paso 1: Obtener el _id y parametros necesarios del empleado (solo se hace por empleado)
+def calculate_employee_evaluation(tenant_id, evaluation, employee_id, filter_range, start_start_date, end_start_date):
+
+    logger.info("Employee: %s", employee_id)
+    logger.info("filter_range: %s", filter_range)
+    logger.info("start_start_date: %s", start_start_date)
+    logger.info("end_start_date: %s", end_start_date)
+
+    # Paso 1: Buscar evaluación guardada
+    evaluation_history_collection = get_collection(tenant_id, "evaluationhistory")
+    existing = evaluation_history_collection.find_one({
+        "employee_id": employee_id,
+        "evaluacion_id": evaluation["_id"],
+        "filter_name": filter_range,
+        "start_date": start_start_date,
+        "end_date": end_start_date
+    })
+
+    if existing:
+        existing["_id"] = str(existing["_id"])
+        return existing  # ⛔️ Aquí devuelves y sales, no calculas más
+
+    # Paso 2: Obtener el _id y parametros necesarios del empleado (solo se hace por empleado)
     employee_collection = get_collection(tenant_id, 'employee')
     employee = employee_collection.find_one({"_id": ObjectId(employee_id)}, {"Nombres": 1, "Apellidos": 1, "Departamento": 1, "Cargo": 1, "Area": 1, "Fecha_de_inicio": 1})
 
@@ -303,6 +351,24 @@ def calculate_employee_evaluation(tenant_id, evaluation, employee_id, start_star
         logger.warning("Error obteniendo desempeño: %s", str(e))
         resultado["desempenio"] = "Error"
         resultado["color"] = "#FF0000"
+
+    # 🔥 Emitir evento SOLO si el filtro es uno de los cacheables
+    CACHEABLE_FILTERS = {"ultimo_mes", "ultimo_trimestre", "ultimo_semestre", "ultimo_anio"}
+    if filter_range in CACHEABLE_FILTERS:
+    # 🔥 Emitir evento para guardar la evaluación
+        save_employee_evaluation_task.delay(tenant_id, {
+            "employee_id": str(employee["_id"]),
+            "evaluacion_id": str(evaluation["_id"]),
+            "department": resultado["departamento"],
+            "cargo": resultado["cargo"],
+            "nota_final": resultado["nota_final"],
+            "desempenio": resultado["desempenio"],
+            "color": resultado["color"],
+            "notas_por_seccion": resultado["notas_por_seccion"],
+            "start_date": start_start_date,
+            "end_date": end_start_date,
+            "filter_name": filter_range,
+        })
 
     return resultado
 
@@ -427,30 +493,33 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
 
     #Paso 1. Obtener la evaluación cacheada o desde MongoDB
     evaluation = get_cached_or_fresh_evaluation(tenant_id, evaluation_id)
-
     if not evaluation:
         return None, "No se encontró la evaluación con el ID proporcionado."
-    
-    # Paso 1: Calcular fechas según filtro
-    if filter_range == "rango_de_fechas":
-        try:
-            start_start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-            start_start_date = TIMEZONE.localize(start_start_date).replace(hour=0, minute=0, second=0).astimezone(pytz.utc)
 
-            end_start_date = datetime.strptime(end_date_str, "%Y-%m-%d")
-            end_start_date = TIMEZONE.localize(end_start_date).replace(hour=23, minute=59, second=59).astimezone(pytz.utc)
-        except ValueError:
-            return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
-    else:
-        rango = calculate_evaluation_range(filter_range, evaluation['Dias_no_laborables'])
-        start_start_date = rango["start"]
-        end_start_date = rango["end"]
+    # # Paso 2: Calcular fechas
+    start_start_date, end_start_date = define_date_ranges(
+        filter_range, start_date_str, end_date_str, evaluation['Dias_no_laborables']
+    )
 
-    # Paso 2: Obtener el _id y parametros necesarios del empleado
+    # Paso 3: Buscar evaluación guardada
+    evaluation_history_collection = get_collection(tenant_id, "evaluationhistory")
+    existing = evaluation_history_collection.find_one({
+        "employee_id": employee_id,
+        "evaluacion_id": evaluation_id,
+        "filter_name": filter_range,
+        "start_date": start_start_date,
+        "end_date": end_start_date
+    })
+
+    if existing:
+        existing["_id"] = str(existing["_id"])
+        return existing  # ⛔️ Aquí devuelves y sales, no calculas más
+
+    # Paso 4: Obtener el _id y parametros necesarios del empleado
     employee_collection = get_collection(tenant_id, 'employee')
     employee = employee_collection.find_one({"_id": ObjectId(employee_id)}, {"Nombres": 1, "Apellidos": 1, "Departamento": 1, "Cargo": 1, "Area": 1, "Fecha_de_inicio": 1})
 
-    # Paso 3: Construir estructura de resultado
+    # Paso 5: Construir estructura de resultado
     resultado = {
         "_id": str(employee["_id"]),
         "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
@@ -488,6 +557,23 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
         resultado["desempenio"] = "Error"
         resultado["color"] = "#FF0000"
 
+    # 🔥 Emitir evento SOLO si el filtro es uno de los cacheables
+    CACHEABLE_FILTERS = {"ultimo_mes", "ultimo_trimestre", "ultimo_semestre", "ultimo_anio"}
+    if filter_range in CACHEABLE_FILTERS:
+        # 🔥 Emitir evento para guardar la evaluación
+        save_employee_evaluation_task.delay(tenant_id, {
+            "employee_id": str(employee["_id"]),
+            "evaluacion_id": str(evaluation_id),
+            "department": resultado["departamento"],
+            "cargo": resultado["cargo"],
+            "nota_final": resultado["nota_final"],
+            "desempenio": resultado["desempenio"],
+            "color": resultado["color"],
+            "notas_por_seccion": resultado["notas_por_seccion"],
+            "start_date": start_start_date,
+            "end_date": end_start_date,
+            "filter_name": filter_range,
+        })
     return resultado
 
 def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, end_date):

@@ -1,19 +1,22 @@
 from datetime import datetime
 from bson import ObjectId
 from evaluation.mongo_client import get_collection  # Ajusta el import según tu proyecto
+import logging
+logger = logging.getLogger(__name__)
 
 def save_or_update_kpi_evaluation(tenant_id: str, data: dict):
     """
     Guarda o actualiza la evaluación KPI de un empleado para un filtro y rango específico
     usando pymongo y conexión dinámica multi-tenant.
     """
+    logger.info("Estoy en save_or_update_kpi_evaluation la función que guarda %s")
 
     collection = get_collection(tenant_id, "evaluationhistory")  # O el nombre que uses
 
     # Construir filtro para buscar documento existente
     filter_query = {
-        "employee_id": ObjectId(data.get("employee_id")),
-        "evaluacion_id": ObjectId(data.get("evaluacion_id")),
+        "employee_id": data.get("employee_id"),
+        "evaluacion_id": data.get("evaluacion_id"),
         "filter_name": data.get("filter_name"),
         "start_date": data.get("start_date"),
         "end_date": data.get("end_date"),

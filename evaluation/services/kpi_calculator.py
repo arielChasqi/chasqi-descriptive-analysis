@@ -62,14 +62,14 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
 
     task_logs_collection = get_collection(tenant_id, 'tasklog')
 
-    logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
+    #logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
 
-    logger.info("kpi_data: %s", kpi_data)
-    logger.info("task_id: %s", task_id)
-    logger.info("tenant_id: %s", tenant_id)
-    logger.info("colaborador_id: %s", colaborador_id)
-    logger.info("start_date: %s", start_date)
-    logger.info("end_date: %s", end_date)
+    #logger.info("kpi_data: %s", kpi_data)
+    #logger.info("task_id: %s", task_id)
+    #logger.info("tenant_id: %s", tenant_id)
+    #logger.info("colaborador_id: %s", colaborador_id)
+    #logger.info("start_date: %s", start_date)
+    #logger.info("end_date: %s", end_date)
 
     try:
         filter_date = kpi_data.get("Filtro_de_fecha", "Fecha_de_creacion")
@@ -98,12 +98,12 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
         raise ValueError(f"Missing required KPI field: {e}")
     
 
-    logger.info("filter_date: %s", filter_date)
-    logger.info("field_to_evaluate: %s", field_to_evaluate)
-    logger.info("formula: %s", formula)
-    logger.info("target: %s", target)
-    logger.info("unit_time: %s", unit_time)
-    logger.info("excluded_days: %s", excluded_days)
+    #logger.info("filter_date: %s", filter_date)
+    #ogger.info("field_to_evaluate: %s", field_to_evaluate)
+    #logger.info("formula: %s", formula)
+    #logger.info("target: %s", target)
+    #logger.info("unit_time: %s", unit_time)
+    #logger.info("excluded_days: %s", excluded_days)
 
     # Construir pipeline
     match_stage = {
@@ -144,7 +144,7 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
     ]
 
     task_logs = list(task_logs_collection.aggregate(pipeline))
-    print("TaskLogs Retrieved:", len(task_logs))
+    #logger.info("TaskLogs Retrieved: %s", len(task_logs))
     values = [log.get(field_to_evaluate) for log in task_logs if log.get(field_to_evaluate) is not None]
 
     # Días considerados
@@ -159,14 +159,14 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
     kpi_percentage = (result_value / target_sales * 100) if target_sales else 0
     rounded_kpi_percentage = round(kpi_percentage, 2)
 
-    logger.info("<------------------Resultados----------------------------------------------------------->: %s")
-    logger.info("rounded_kpi_percentage: %s", rounded_kpi_percentage)
-    logger.info("result_value: %s", result_value)
-    logger.info("days_considered: %s", days_considered)
-    logger.info("target_sales: %s", target_sales)
-    logger.info("non_considered_days: %s", non_considered_days)
+    #logger.info("<------------------Resultados----------------------------------------------------------->: %s")
+    #logger.info("rounded_kpi_percentage: %s", rounded_kpi_percentage)
+    #logger.info("result_value: %s", result_value)
+    #logger.info("days_considered: %s", days_considered)
+    #logger.info("target_sales: %s", target_sales)
+    #logger.info("non_considered_days: %s", non_considered_days)
 
-    logger.info("<-----------------Finaliza la evaluación de un KPI ------------------------------------------>: %s")
+    #logger.info("<-----------------Finaliza la evaluación de un KPI ------------------------------------------>: %s")
 
     return {
         "kpiPercentage": rounded_kpi_percentage,
