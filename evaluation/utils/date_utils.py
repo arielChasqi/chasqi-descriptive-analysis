@@ -52,7 +52,7 @@ def calculate_evaluation_range(filter_range, excluded_days):
     elif filter_range == "ultimo_mes":
         prev_month = now - relativedelta(months=1)
         start = prev_month.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        end = (now.replace(day=1) - timedelta(days=1)).replace(hour=23, minute=59, second=59)
+        end = (now.replace(day=1) - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=0)
 
     elif filter_range == "ultimo_trimestre":
         current_month = now.month
@@ -64,7 +64,7 @@ def calculate_evaluation_range(filter_range, excluded_days):
         else:
             start_year = now.year
         start = datetime(start_year, start_month, 1, tzinfo=TIMEZONE)
-        end = (start + relativedelta(months=3) - timedelta(days=1)).replace(hour=23, minute=59, second=59)
+        end = (start + relativedelta(months=3) - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=0)
 
     elif filter_range == "ultimo_semestre":
         if now.month >= 7:
