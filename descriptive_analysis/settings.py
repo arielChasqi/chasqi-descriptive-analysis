@@ -71,7 +71,8 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
-    'content-type',
+    "x-tenant-id",
+    "content-type",
 ]
 
 ROOT_URLCONF = 'descriptive_analysis.urls'

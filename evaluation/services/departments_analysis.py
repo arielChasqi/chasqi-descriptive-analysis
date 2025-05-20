@@ -42,7 +42,6 @@ def group_employees_by_department(tenant_id):
     ], key=lambda x: x["numero_empleados"], reverse=True)
 
     return {
-        "message": "Distribución por departamento",
         "total_empleados": total,
         "resultado": resultado
     }, None
@@ -222,4 +221,4 @@ def get_employees_by_department(tenant_id, department_id):
     logger.info("total %s", total)
     logger.info("empleados %s", empleados)
 
-    return empleados
+    return empleados, {"_id": str(departamento["_id"]), "name": dept_name}

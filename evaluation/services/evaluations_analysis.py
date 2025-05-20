@@ -107,7 +107,7 @@ def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_d
 
 #<-------------------------------------------METHOD TO GET DEPARTMENT EVALUATION----------------------------------------------------------------->
 
-def calculate_evaluation_for_department(tenant_id, employees, filter_range, start_date_str, end_date_str):
+def calculate_evaluation_for_department(tenant_id, employees, filter_range, start_date_str, end_date_str, dept_meta=None):
 
     evaluations = []  # Lista para almacenar los resultados
     total_score = 0  # Para calcular el promedio del departamento
@@ -152,7 +152,6 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
     for position, employees_in_position in employees_by_position.items():
         total_position_score = sum([employee["nota_final"] for employee in employees_in_position])
         avg_score = total_position_score / len(employees_in_position)
-
         average_by_position[position] = round(avg_score, 2)
 
         try:
@@ -179,31 +178,38 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
         department_desempenio = "Error"
         department_color = "#FF0000"
 
-    # Paso 6: Agrupar evaluaciones por cargo
-    grouped_evaluations_by_cargo = {
-        position: employees_in_position
-        for position, employees_in_position in employees_by_position.items()
-    }
-
-    # Paso Final: Crear el objeto con el resultado final
+    #Paso 6: Formatear el resultado
     department_result = {
-        "promedio_departamento": round(department_average, 2),
-        "desempenio": department_desempenio,
+        "_id": dept_meta["_id"] if dept_meta else None,
+        "name": dept_meta["name"] if dept_meta else "Desconocido", 
+        "average": round(department_average, 2),
+        "performance": department_desempenio,
         "color": department_color,
-        "total_empleados": total_employees,
-        "empleados_por_cargo": {
-            position: {
-                "numero_empleados": len(employees_in_position),
-                "promedio_nota": round(average_by_position[position], 2),
-                "desempenio": position_performance[position]["desempenio"],
-                "color": position_performance[position]["color"],
-                "evaluaciones_empleados": employees_in_position  # 👈 Aquí va el agrupamiento
-            }
-            for position, employees_in_position in grouped_evaluations_by_cargo.items()
-        }
+        "totalEmployees": total_employees,
+        "sections": []
     }
 
-    # Paso 7: Retornar el resultado del departamento
+    for position, employees_in_position in employees_by_position.items():
+        section_data = {
+            "name": position,
+            "average": average_by_position[position],
+            "performance": position_performance[position]["desempenio"],
+            "color": position_performance[position]["color"],
+            "members": []
+        }
+
+        for emp in employees_in_position:
+            section_data["members"].append({
+                "name": emp["colaborador"],
+                "position": emp["cargo"],
+                "evaluation": emp.get("nombreEvaluacion", "Sin nombre"),
+                "score": emp["nota_final"],
+                "performance": emp["desempenio"],
+                "color": emp["color"]
+            })
+
+        department_result["sections"].append(section_data)
+
     return department_result
 
 def calculate_single_employee_evaluation_department(tenant_id, evaluation_id, employee, filter_range, start_date_str, end_date_str):

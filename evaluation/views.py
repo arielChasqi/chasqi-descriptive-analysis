@@ -85,8 +85,8 @@ def group_by_department(request):
         return JsonResponse({"error": "Método no permitido, usa POST"}, status=405)
 
     try:
+        tenant_id = request.headers.get('x-tenant-id')
         data = json.loads(request.body)
-        tenant_id = data.get('tenantId')
         department_id = data.get('departamentId')
 
         if not tenant_id:
@@ -113,7 +113,7 @@ def group_evaluations_by_department(request):
 
     try:
         data = json.loads(request.body)
-        tenant_id = data.get('tenantId')
+        tenant_id = request.headers.get('x-tenant-id')
         department_id = data.get('departamentId')
 
         if not tenant_id:
@@ -154,14 +154,17 @@ def group_secctions_and_kpis(request):
     
 @csrf_exempt  
 def evaluate(request):
+    tenant_id = request.headers.get('x-tenant-id')
     data = json.loads(request.body)
-    tenant_id = data.get('tenantId')
-    evaluation_id = data.get('evaluationId')
+    evaluation_id = data.get('evaluationId', None)
     employee_id = data.get('employeeId', None)
     department_id = data.get('departmentId', None)
     filter_range = data.get('filterRange')
-    start_date_str = data.get('startDateE')
-    end_date_str = data.get('endDateE')
+    start_date_str = data.get('startDateE', None)
+    end_date_str = data.get('endDateE', None)
+
+    if not tenant_id:
+        return JsonResponse({"error": "Falta el parámetro tenantId"}, status=400)
 
     # Verifica si los datos llegaron correctamente
     print(f"Tenant ID: {tenant_id}, Evaluation ID: {evaluation_id}, Employee ID: {employee_id}, Department ID: {department_id},Filter Range: {filter_range}, Start Date: {start_date_str}, End Date: {end_date_str}")
