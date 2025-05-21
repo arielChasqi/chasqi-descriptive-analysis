@@ -132,7 +132,7 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
         # Paralelizamos el cálculo de evaluación de todos los empleados
         resultados = list(executor.map(
             lambda employee: calculate_single_employee_evaluation_department(
-                tenant_id, employee, employee, filter_range, start_start_date, end_start_date
+                tenant_id, employee, filter_range, start_start_date, end_start_date
             ),
             employees  # Lista de empleados
         ))
@@ -141,7 +141,6 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
     for resultado in resultados:
         evaluations.append(resultado)
         total_score += resultado["nota_final"]
-
         # Agrupamos empleados por cargo
         employees_by_position[resultado["cargo"]].append(resultado)
 
@@ -200,6 +199,7 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
 
         for emp in employees_in_position:
             section_data["members"].append({
+                "_id": emp["_id"],
                 "name": emp["colaborador"],
                 "position": emp["cargo"],
                 "evaluation": emp.get("nombreEvaluacion", "Sin nombre"),
@@ -212,10 +212,10 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
 
     return department_result
 
-def calculate_single_employee_evaluation_department(tenant_id, evaluation_id, employee, filter_range, start_date_str, end_date_str):
+def calculate_single_employee_evaluation_department(tenant_id, employee, filter_range, start_date_str, end_date_str):
     # Paso 1: Construir estructura de resultado predeterminado
     resultado = {
-        "_id": str(employee["_id"]),
+        "_id": str(employee["_id"]) if isinstance(employee.get("_id"), (str, ObjectId)) else "SIN_ID",
         "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
         "departamento": employee.get("Departamento", "No asignado"),
         "cargo": employee.get("Cargo", "No asignado"),
@@ -260,8 +260,8 @@ def calculate_single_employee_evaluation_department(tenant_id, evaluation_id, em
 
     if existing:
         evaluation_result = {
-        "_id": str(existing["_id"]),
-        "employee_id": str(existing["employee_id"]),
+        "_id": str(employee["_id"]),
+        "evaluation_doc_id": str(existing["_id"]),
         "evaluation_id": str(existing["evaluacion_id"]),
         "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
         "departamento": existing.get("department", "No asignado"),
