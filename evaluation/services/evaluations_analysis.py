@@ -202,6 +202,7 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
                 "_id": emp["_id"],
                 "name": emp["colaborador"],
                 "position": emp["cargo"],
+                "evaluationId": emp["evaluationId"],
                 "evaluation": emp.get("nombreEvaluacion", "Sin nombre"),
                 "score": emp["nota_final"],
                 "performance": emp["desempenio"],
