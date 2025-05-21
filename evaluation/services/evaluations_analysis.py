@@ -32,6 +32,39 @@ def search_evaluation_history(data):
         return doc
 
 #<----------------------------------------------------------------------------------------------------------------------------------------------->
+def employee_evaluations(tenant_id, employee_id):
+    employee_collection = get_collection(tenant_id, 'employee')
+    evaluation_collection = get_collection(tenant_id, 'evaluation')
+
+    employee = employee_collection.find_one(
+        {"_id": ObjectId(employee_id)},
+        {"Evaluations": 1}
+    )
+
+    if not employee:
+        return None, "Empleado no encontrado"
+
+    evaluation_ids = employee.get("Evaluations", [])
+    if not evaluation_ids:
+        return None, "Este empleado no posee evaluaciones"
+
+    evaluaciones = list(evaluation_collection.find(
+        {"_id": {"$in": evaluation_ids}},
+        {"Nombre": 1}
+    ))
+
+    if not evaluaciones:
+        return None, "No se encontraron evaluaciones en la base de datos"
+
+    logger.info("employee_evaluations %s", evaluation_ids)
+    logger.info("evaluaciones %s", evaluaciones)
+
+     # Convertir ObjectId a str para JSON
+    return [
+        {"_id": str(ev["_id"]), "Nombre": ev.get("Nombre", "")}
+        for ev in evaluaciones
+    ], None
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
 def group_secctions_kpis(tenant_id, evaluation_id):
     evaluation_collection = get_collection(tenant_id, 'evaluation')
     kpis_collection = get_collection(tenant_id, 'kpi')

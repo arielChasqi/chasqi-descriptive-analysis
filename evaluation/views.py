@@ -16,7 +16,10 @@ from evaluation.services.departments_analysis import (
     group_evaluations_by_departmentId,
 )
 
-from evaluation.services.evaluations_analysis import group_secctions_kpis
+from evaluation.services.evaluations_analysis import (
+    group_secctions_kpis,
+    employee_evaluations
+)
 
 from .mongo_client import get_collection
 
@@ -181,6 +184,29 @@ def evaluate(request):
 
     return JsonResponse(result, safe=False)
 
+@csrf_exempt
+def get_employee_evaluations(request):
+    if request.method != 'GET':
+        return JsonResponse({"error": "Método no permitido, usa GET"}, status=405)
+
+    try: 
+        tenant_id = request.headers.get('x-tenant-id')
+        employee_id = request.GET.get('employeeId')
+
+        if not tenant_id or not employee_id:
+            return JsonResponse({"error":  "Falta el parámetro tenantId o employeeId"}, status=400)
+        
+        response, error = employee_evaluations(tenant_id, employee_id)
+
+        if error: 
+            return JsonResponse({"error": error}, status=404) 
+        
+        return JsonResponse(response, safe=False)
+        
+    except Exception as e: 
+        return JsonResponse({"error": str(e)}, status=500)
+
+
 @csrf_exempt  # Para evitar error CSRF con llamadas externas
 def recibir_tasklog_trigger(request):
     if request.method == "POST":
@@ -194,3 +220,4 @@ def recibir_tasklog_trigger(request):
 
         return JsonResponse({"status": "ok"})
     return JsonResponse({"error": "Método no permitido"}, status=405)
+

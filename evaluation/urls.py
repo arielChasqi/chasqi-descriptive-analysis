@@ -8,5 +8,6 @@ urlpatterns = [
     path('total-evaluations-department/', views.group_evaluations_by_department, name='group_evaluations_by_department'),
     path('sections-with-kpis/', views.group_secctions_and_kpis, name='group_secctions_and_kpis'),
     path('evaluate/', views.evaluate, name='evaluate'),
+    path('get-employee-evaluations', views.get_employee_evaluations, name='get-employee-evaluations'),
     path('webhook/tasklog/', views.recibir_tasklog_trigger, name='recibir_tasklog_trigger'),
 ]
