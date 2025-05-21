@@ -56,8 +56,8 @@ def employee_evaluations(tenant_id, employee_id):
     if not evaluaciones:
         return None, "No se encontraron evaluaciones en la base de datos"
 
-    logger.info("employee_evaluations %s", evaluation_ids)
-    logger.info("evaluaciones %s", evaluaciones)
+    #logger.info("employee_evaluations %s", evaluation_ids)
+    #logger.info("evaluaciones %s", evaluaciones)
 
      # Convertir ObjectId a str para JSON
     return [
@@ -95,7 +95,7 @@ def save_main_employee_evaluation_function(tenant_id, employee_id, evaluation_id
         {"$set": {"Evaluations": evaluations}}
     )
 
-    logger.info("Evaluación principal actualizada para empleado %s", employee_id)
+    #logger.info("Evaluación principal actualizada para empleado %s", employee_id)
 
     return {"status": "Evaluación principal actualizada"}, None
 
@@ -400,7 +400,7 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, s
         logger.error("No se encontraron empleados para evaluar en esta evaluación.")
         return {"error": "No se encontraron empleados para evaluar."}
 
-    logger.info("Empleados a evaluar: %s", evaluados)
+    #logger.info("Empleados a evaluar: %s", evaluados)
 
     # Paso 2: Calcular fechas
     start_start_date, end_start_date = define_date_ranges(

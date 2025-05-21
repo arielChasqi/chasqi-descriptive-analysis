@@ -9,7 +9,7 @@ def save_or_update_kpi_evaluation(tenant_id: str, data: dict):
     Guarda o actualiza la evaluación KPI de un empleado para un filtro y rango específico
     usando pymongo y conexión dinámica multi-tenant.
     """
-    logger.info("Estoy en save_or_update_kpi_evaluation la función que guarda %s")
+    #logger.info("Estoy en save_or_update_kpi_evaluation la función que guarda %s")
 
     collection = get_collection(tenant_id, "evaluationhistory")  # O el nombre que uses
 

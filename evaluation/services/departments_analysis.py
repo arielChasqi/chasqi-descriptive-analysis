@@ -218,7 +218,7 @@ def get_employees_by_department(tenant_id, department_id):
         return None, f"No hay empleados activos con evaluaciones en el departamento '{dept_name}'"
 
     total = len(empleados)
-    logger.info("total %s", total)
-    logger.info("empleados %s", empleados)
+    #logger.info("total %s", total)
+    #logger.info("empleados %s", empleados)
 
     return empleados, {"_id": str(departamento["_id"]), "name": dept_name}
