@@ -64,6 +64,41 @@ def employee_evaluations(tenant_id, employee_id):
         {"_id": str(ev["_id"]), "Nombre": ev.get("Nombre", "")}
         for ev in evaluaciones
     ], None
+
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
+def save_main_employee_evaluation_function(tenant_id, employee_id, evaluation_id):
+    employee_collection = get_collection(tenant_id, 'employee')
+
+    employee = employee_collection.find_one(
+        {"_id": ObjectId(employee_id)},
+        {"Evaluations": 1}
+    )
+
+    if not employee:
+        return None, "Empleado no encontrado"
+
+    evaluations = employee.get("Evaluations", [])
+    if not evaluations:
+        return None, "Este empleado no posee evaluaciones"
+
+    eval_oid = ObjectId(evaluation_id)
+    if eval_oid not in evaluations:
+        return None, "La evaluación no pertenece al empleado"
+
+    # Reordenar: mover al frente
+    evaluations.remove(eval_oid)
+    evaluations.insert(0, eval_oid)
+
+    # Guardar actualización
+    employee_collection.update_one(
+        {"_id": ObjectId(employee_id)},
+        {"$set": {"Evaluations": evaluations}}
+    )
+
+    logger.info("Evaluación principal actualizada para empleado %s", employee_id)
+
+    return {"status": "Evaluación principal actualizada"}, None
+
 #<----------------------------------------------------------------------------------------------------------------------------------------------->
 def group_secctions_kpis(tenant_id, evaluation_id):
     evaluation_collection = get_collection(tenant_id, 'evaluation')
@@ -115,8 +150,6 @@ def group_secctions_kpis(tenant_id, evaluation_id):
     return {
         "resultado": resultado
     }, None
-
-
 #<--------------------------------------------METHOD TO CALCULATE DATE RANGE--------------------------------------------------------------------->
 def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_days_evaluation):
     # Paso 1: Calcular fechas según filtro
