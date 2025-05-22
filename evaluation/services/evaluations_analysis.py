@@ -1,8 +1,9 @@
-from datetime import datetime
-from bson import ObjectId
+from datetime import datetime, timedelta
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from bson import ObjectId
 import pytz
+from dateutil.relativedelta import relativedelta
 from evaluation.services.kpi_calculator import get_kpi_evaluation
 from evaluation.mongo_client import get_collection
 from evaluation.utils.date_utils import calculate_evaluation_range
@@ -150,6 +151,45 @@ def group_secctions_kpis(tenant_id, evaluation_id):
     return {
         "resultado": resultado
     }, None
+
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
+def get_timeline_employee_evaluation(tenant_id, evaluation_id, employee_id, filter_range, number_of_data):
+    now = datetime.now(TIMEZONE)
+    timeline = []
+
+    for i in range(number_of_data):
+        # Retroceder i meses desde el inicio del mes actual
+        month_date = (now.replace(day=1) - relativedelta(months=i))
+
+        start_date = month_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end_date = (start_date + relativedelta(months=1)) - timedelta(seconds=1)
+
+        start_str = start_date.strftime("%Y-%m-%d")
+        end_str = end_date.strftime("%Y-%m-%d")
+
+        result = calculate_single_employee_evaluation(
+            tenant_id,
+            evaluation_id,
+            employee_id,
+            "rango_de_fechas",
+            start_str,
+            end_str
+        )
+
+        if isinstance(result, tuple):
+            # Manejo de error: función devolvió (None, "error")
+            continue
+
+        timeline.append({
+            "month": start_date.strftime("%b %Y"),
+            "score": result["nota_final"]
+        })
+
+    # Invertimos para que sea cronológico (enero → abril)
+    timeline.reverse()
+
+    return timeline, None
+
 #<--------------------------------------------METHOD TO CALCULATE DATE RANGE--------------------------------------------------------------------->
 def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_days_evaluation):
     # Paso 1: Calcular fechas según filtro
@@ -673,7 +713,7 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
 
     if existing:
         existing["_id"] = str(existing["_id"])
-        return existing  # ⛔️ Aquí devuelves y sales, no calculas más
+        return existing 
 
     # Paso 4: Obtener el _id y parametros necesarios del empleado
     employee_collection = get_collection(tenant_id, 'employee')

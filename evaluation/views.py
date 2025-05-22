@@ -19,7 +19,8 @@ from evaluation.services.departments_analysis import (
 from evaluation.services.evaluations_analysis import (
     group_secctions_kpis,
     employee_evaluations,
-    save_main_employee_evaluation_function
+    save_main_employee_evaluation_function,
+    get_timeline_employee_evaluation
 )
 
 @csrf_exempt
@@ -94,6 +95,34 @@ def group_secctions_and_kpis(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+    
+
+@csrf_exempt
+def timeline_employee_evaluation(request):
+    if request.method != 'POST':
+        return JsonResponse({"error": "Método no permitido, usa POST"}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        tenant_id = request.headers.get('x-tenant-id')
+        evaluation_id = data.get('evaluationId')
+        employee_id = data.get('employeeId')
+        filter_range = data.get('filterRange')
+        number_of_data = data.get('numberOfData')
+
+        if not tenant_id or not evaluation_id or not employee_id or not filter_range:
+            return JsonResponse({"error": "Falta parámetros para realizar la gráfica TimeLine"}, status=400)
+
+        response, error = get_timeline_employee_evaluation(tenant_id, evaluation_id, employee_id, filter_range, number_of_data)
+ 
+        if error:
+            return JsonResponse({"error": error}, status=404)
+
+        return JsonResponse(response, safe=False)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
     
 @csrf_exempt  
 def evaluate(request):
@@ -183,4 +212,3 @@ def recibir_tasklog_trigger(request):
 
         return JsonResponse({"status": "ok"})
     return JsonResponse({"error": "Método no permitido"}, status=405)
-
