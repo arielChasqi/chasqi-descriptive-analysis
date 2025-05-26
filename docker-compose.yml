@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  django:
+    build: .
+    container_name: django-app
+    restart: unless-stopped
+    ports:
+      - "3015:3015"
+    env_file:
+      - .env
+    depends_on:
+      - redis-django
+    command: python manage.py runserver 0.0.0.0:3015
+
+  redis-django:
+    image: redis:6.2-alpine
+    container_name: redis-django
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+networks:
+  default:
+    name: django-net
