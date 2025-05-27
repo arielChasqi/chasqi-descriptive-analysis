@@ -11,7 +11,7 @@ services:
       - .env
     depends_on:
       - redis-django
-    command: python manage.py runserver 0.0.0.0:3015
+    command: gunicorn descriptive_analysis.wsgi:application --bind 0.0.0.0:3015 --workers 4
 
   redis-django:
     image: redis:6.2-alpine
