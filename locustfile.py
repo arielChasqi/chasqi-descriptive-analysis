@@ -1,21 +1,22 @@
 from locust import HttpUser, task, between
 
 class TasklogUser(HttpUser):
-    wait_time = between(0.5, 1)
+    wait_time = between(0.01, 0.05)
 
     @task
     def post_tasklog(self):
         payload = {
-            "taskId": "675af3f67e94b212da4e16f6",
-            "colaboradorId": "6759f827f200c21186d034f7",
-            "fechasEvaluadas": {
-                "Ultima_actualizacion": "2025-04-01T18:57:07.366Z",
-                "Date_of_Assignment": "2024-12-11T00:00:00.000Z"
-            },
-            "kpiIds": [
-                "67881d8ae700dc4b3791c89f",
-                "67a4c6f239c9856e81dfd691"
-            ]
+            "_id": "68226bb3b6756f3d39a73082",
+            "TaskId": "67b64b0a441df99098206a4e",
+            "colaboradorId": "67b61998441df9909820070c",
+            "Record_ID": "77150076970",
+            "created_by": "DIANA DEL PILAR CARDENAS RIOS",
+            "Activity_assigned_to": "Elizabet Ramirez",
+            "hs_create_date": "2025-04-15T18:22:05.327+00:00",
+            "hs_activity_date": "2025-04-16T11:00:00.000+00:00",
+            "Meeting_outcome": "NO_SHOW",
+            "Call_and_meeting_type": "Demo meeting",
+            "Ultima_actualizacion": "2025-04-01T18:57:07.366Z",
         }
 
         headers = {

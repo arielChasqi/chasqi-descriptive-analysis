@@ -12,6 +12,7 @@ services:
     depends_on:
       - redis-django
     command: python manage.py runserver 0.0.0.0:3015
+    #command: gunicorn descriptive_analysis.wsgi:application --bind 0.0.0.0:3015 --workers 4 (Produccion)
 
   redis-django:
     image: redis:6.2-alpine
@@ -19,6 +20,9 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - ./evaluation/redis.conf:/usr/local/etc/redis/redis.conf
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
 
 networks:
   default:

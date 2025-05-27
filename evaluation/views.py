@@ -1,4 +1,5 @@
 from django.views.decorators.csrf import csrf_exempt
+from django_ratelimit.decorators import ratelimit
 from django.http import JsonResponse
 import json
 from bson import ObjectId
@@ -22,6 +23,8 @@ from evaluation.services.evaluations_analysis import (
     save_main_employee_evaluation_function,
     get_timeline_employee_evaluation
 )
+
+from evaluation.services.evaluation_cache import save_changed_tasklogs
 
 @csrf_exempt
 def group_by_department(request):
@@ -199,16 +202,27 @@ def save_main_employee_evaluation(request):
     except Exception as e: 
         return JsonResponse({"error": str(e)}, status=500)
 
-@csrf_exempt  # Para evitar error CSRF con llamadas externas
+@csrf_exempt
+@ratelimit(key='ip', rate='100/m', block=True)
 def recibir_tasklog_trigger(request):
     if request.method == "POST":
-        data = json.loads(request.body)
-        print("✅ Trigger recibido:", data)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "JSON inválido"}, status=400)
 
-        # Acceder a headers
         tenant = request.headers.get('x-tenant-id')
         auth = request.headers.get('authorization')
-        print(f"Tenant: {tenant} | Auth: {auth}")
 
-        return JsonResponse({"status": "ok"})
+        if not tenant or not data:
+            return JsonResponse({"error": "Faltan datos obligatorios"}, status=400)
+
+        # Delegar el procesamiento a una función modular
+        ok = save_changed_tasklogs(tenant_id=tenant, payload=data)
+
+        if ok:
+            return JsonResponse({"status": "queued"})
+        else:
+            return JsonResponse({"error": "Error al guardar en Redis"}, status=500)
+
     return JsonResponse({"error": "Método no permitido"}, status=405)

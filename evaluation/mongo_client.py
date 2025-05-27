@@ -4,7 +4,7 @@ from decouple import config  # Importamos config de python-decouple
 
 # Leer la cadena de conexión del archivo .env
 db_connection_string = config('DB_CONNECTION_STRING')
-#print(f"DB_CONNECTION_STRING: {db_connection_string}")  # Imprimir para verificar que se carga correctamente
+print(f"DB_CONNECTION_STRING: {db_connection_string}")  # Imprimir para verificar que se carga correctamente
 
 # Crear la conexión a MongoDB
 client = MongoClient(db_connection_string)

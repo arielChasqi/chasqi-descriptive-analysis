@@ -83,3 +83,17 @@ def clean_kpi(kpi: dict) -> dict:
         else:
             result[k] = v
     return result
+
+def save_changed_tasklogs(tenant_id: str, payload: dict) -> bool:
+    try:
+        event = {
+            "tenant": tenant_id,
+            "payload": payload
+        }
+        redis_client.lpush('tasklog_events', json.dumps(event))
+        return True
+    except Exception as e:
+        # Aquí podrías loggear el error si quieres rastrear
+        print(f"❌ Error al guardar en Redis: {e}")
+        return False
+
