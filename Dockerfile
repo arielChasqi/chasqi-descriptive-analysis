@@ -15,5 +15,4 @@ COPY . .
 EXPOSE 3015
 
 # Comando por defecto
-CMD ["python", "manage.py", "runserver", "0.0.0.0:3015"]
-#CMD ["gunicorn", "descriptive_analysis.wsgi:application", "--bind", "0.0.0.0:3015", "--workers", "4"]
+CMD ["gunicorn", "descriptive_analysis.wsgi:application", "--bind", "0.0.0.0:3015", "--workers", "4"]

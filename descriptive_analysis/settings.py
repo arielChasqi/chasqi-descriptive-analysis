@@ -25,6 +25,7 @@ PORT = config('PORT', default=3015, cast=int)
 REDIS_HOST = config('REDIS_HOST', default='localhost')
 REDIS_PORT = config('REDIS_PORT', cast=int, default=6379)
 REDIS_DB = config('REDIS_DB', cast=int, default=0)
+FRONT_ACCES_CORS = config('FRONT_ACCES_CORS', default='http://localhost:3000')
 
 #Params to emit events in project
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
@@ -40,8 +41,7 @@ SECRET_KEY = 'django-insecure-1re7xq#9rd3=5ib%)ga_p6h^g7^5hh9!$9+k7a5d3aw-*3m-co
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['12ce-2800-bf0-177-1249-203f-fd97-9009-c04e.ngrok-free.app', 'localhost']
-
+ALLOWED_HOSTS = ['12ce-2800-bf0-177-1249-203f-fd97-9009-c04e.ngrok-free.app', '3.22.250.72', 'localhost', '127.0.0.1']
 
 # Application definition
 
@@ -66,9 +66,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = True
+
 
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "x-tenant-id",
