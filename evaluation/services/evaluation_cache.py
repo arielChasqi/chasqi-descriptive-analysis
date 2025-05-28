@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Optional
 from evaluation.mongo_client import get_collection
 from evaluation.utils.redis_client import redis_client
 
+logger = logging.getLogger(__name__)
+
 def get_cached_or_fresh_evaluation(tenant_id, evaluation_id): 
     #1. Buscar en Redis
     key = f"tenant:{tenant_id}:evaluation:{evaluation_id}"
@@ -90,6 +92,9 @@ def save_changed_tasklogs(tenant_id: str, payload: dict) -> bool:
             "tenant": tenant_id,
             "payload": payload
         }
+
+        logger.info("Estoy aquí a lo que emites el evento a redis :D %s")
+
         redis_client.lpush('tasklog_events', json.dumps(event))
         return True
     except Exception as e:
