@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from bson import ObjectId
 import pytz
 from dateutil.relativedelta import relativedelta
-from evaluation.services.kpi_calculator import get_kpi_evaluation
+from evaluation.services.kpi_calculator import (get_kpi_evaluation, calculate_working_days)
 from evaluation.mongo_client import get_collection
 from evaluation.utils.date_utils import calculate_evaluation_range
 from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
@@ -15,6 +15,19 @@ TIMEZONE = pytz.timezone("America/Guayaquil")
 
 import logging
 logger = logging.getLogger(__name__)
+
+#<---------------------------------------------------------------------------------------------------------------------------------------------->
+def convert_day_names_to_indices(day_names):
+    day_name_to_index = {
+        "Monday": 0,
+        "Tuesday": 1,
+        "Wednesday": 2,
+        "Thursday": 3,
+        "Friday": 4,
+        "Saturday": 5,
+        "Sunday": 6
+    }
+    return [day_name_to_index[d] for d in day_names if d in day_name_to_index]
 
 #<----------------------------------------------------------------------------------------------------------------------------------------------->
 def search_evaluation_history(data):
@@ -190,8 +203,82 @@ def get_timeline_employee_evaluation(tenant_id, evaluation_id, employee_id, filt
 
     return timeline, None
 
+#<----------------------------------------------------------------------------------------------------------------------------------------------->
+def calculate_data_sections(resultados):
+    # 1️⃣ Agrupar datos por sección con totales y cuenta, y guardar título
+    medias_por_seccion = {}
+    for resultado in resultados:
+        for seccion in resultado.get("notas_por_seccion", []):
+            seccion_id = seccion["_id"]
+            if seccion_id not in medias_por_seccion:
+                medias_por_seccion[seccion_id] = {
+                    "total": 0,
+                    "count": 0,
+                    "titulo": seccion.get("titulo", "")
+                }
+            medias_por_seccion[seccion_id]["total"] += seccion.get("nota_seccion", 0)
+            medias_por_seccion[seccion_id]["count"] += 1
+
+    # 2️⃣ Calcular promedio por sección
+    promedio_por_seccion = {
+        seccion_id: round(data["total"] / data["count"], 2) if data["count"] > 0 else 0
+        for seccion_id, data in medias_por_seccion.items()
+    }
+
+    # 3️⃣ Construir estructura dataSections
+    data_sections = []
+    for seccion_id, data in medias_por_seccion.items():
+        titulo = data["titulo"]
+        media = promedio_por_seccion.get(seccion_id, 0)
+
+        # Reunir todos los KPIs para la sección
+        all_kpis = []
+        for resultado in resultados:
+            for seccion in resultado.get("notas_por_seccion", []):
+                if seccion["_id"] == seccion_id:
+                    all_kpis.extend(seccion.get("detalles_kpis", []))
+
+        # Agrupar KPIs por _id para promediar notas ponderadas
+        kpi_map = defaultdict(lambda: {"total": 0, "count": 0, "name": ""})
+        for kpi in all_kpis:
+            kpi_id = kpi["_id"]
+            kpi_map[kpi_id]["total"] += kpi.get("nota_ponderada", 0)
+            kpi_map[kpi_id]["count"] += 1
+            if not kpi_map[kpi_id]["name"]:
+                kpi_map[kpi_id]["name"] = kpi.get("kpi", "")
+
+        # Crear lista final de KPIs con promedio
+        kpis = []
+        for kpi_id, kpi_data in kpi_map.items():
+            avg_value = round(kpi_data["total"] / kpi_data["count"], 2) if kpi_data["count"] > 0 else 0
+            kpis.append({
+                "_id": kpi_id,
+                "name": kpi_data["name"],
+                "ranking": "",
+                "value": avg_value,
+                "oldValue": 50,
+                "color": "",
+                "colorRanking": ""
+            })
+
+        data_sections.append({
+            "_id": seccion_id,
+            "name": titulo,
+            "ranking": "",
+            "value": media,
+            "oldValue": 50,
+            "color": "",
+            "colorRanking": "",
+            "selected": False,
+            "kpis": kpis
+        })
+
+    return data_sections
+
 #<--------------------------------------------METHOD TO CALCULATE DATE RANGE--------------------------------------------------------------------->
 def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_days_evaluation):
+    excluded_days = convert_day_names_to_indices(non_working_days_evaluation)
+    
     # Paso 1: Calcular fechas según filtro
     if filter_range == "rango_de_fechas":
         try:
@@ -201,15 +288,21 @@ def define_date_ranges(filter_range, start_date_str, end_date_str, non_working_d
             end_start_date = datetime.strptime(end_date_str, "%Y-%m-%d")
             end_start_date = TIMEZONE.localize(end_start_date).replace(hour=23, minute=59, second=59).astimezone(pytz.utc)
 
-            return start_start_date, end_start_date
+            # Calculamos días laborables también para mantener la consistencia
+            days_considered, non_considered_days = calculate_working_days(start_start_date, end_start_date, excluded_days)
+            
+            return start_start_date, end_start_date, days_considered, non_considered_days
         
         except ValueError:
-            return None, "Fechas inválidas. Usa formato YYYY-MM-DD"
+            return None, None, 0, 0
     else:
         rango = calculate_evaluation_range(filter_range, non_working_days_evaluation)
         start_start_date = rango["start"]
         end_start_date = rango["end"]
-        return start_start_date, end_start_date
+
+        days_considered, non_considered_days = calculate_working_days(start_start_date, end_start_date, excluded_days)
+
+        return start_start_date, end_start_date, days_considered, non_considered_days
 
 #<-------------------------------------------METHOD TO GET DEPARTMENT EVALUATION----------------------------------------------------------------->
 
@@ -443,7 +536,7 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, s
     #logger.info("Empleados a evaluar: %s", evaluados)
 
     # Paso 2: Calcular fechas
-    start_start_date, end_start_date = define_date_ranges(
+    start_start_date, end_start_date, dias_laborables, dias_no_laborables = define_date_ranges(
         filter_range, start_date_str, end_date_str, evaluation['Dias_no_laborables']
     )
 
@@ -454,6 +547,8 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, s
                 tenant_id, evaluation, employee, filter_range, start_start_date, end_start_date),
             evaluados  # Ahora estamos usando la lista de empleados directamente
         ))
+
+    resultados.sort(key=lambda x: x.get("nota_final", 0), reverse=True)
 
     #Paso 4: Calcular la media de la evaluación
     total_notas = sum(resultado["nota_final"] for resultado in resultados)
@@ -477,13 +572,20 @@ def calculate_evaluation_for_employees(tenant_id, evaluation_id, filter_range, s
         for seccion_id, seccion_data in medias_por_seccion.items()
     ]
 
+    data_sections = calculate_data_sections(resultados)
+
     # Paso Final: Retornar los resultados
     return {
         "resultados": resultados,
-        "start_date": start_start_date.isoformat(),
-        "end_date": end_start_date.isoformat(),
-        "media_evaluacion": media_evaluacion,  # Media total de todas las evaluaciones
-        "promedio_por_seccion": promedio_por_seccion  # Promedio por cada sección
+        "totalEmployees": len(evaluados),
+        "totalPages": 1,
+        "currentPage": 1,
+        "periodo_inicial": start_start_date.isoformat(),
+        "periodo_final": end_start_date.isoformat(),
+        "media_evaluacion": media_evaluacion,
+        "medias_por_seccion": promedio_por_seccion,  
+        "dias_laborables": dias_laborables,
+        "dataSections": data_sections
     }
 
 def calculate_employee_evaluation(tenant_id, evaluation, employee_id, filter_range, start_start_date, end_start_date):
@@ -503,16 +605,25 @@ def calculate_employee_evaluation(tenant_id, evaluation, employee_id, filter_ran
         "end_date": end_start_date
     })
 
-    if existing:
-        existing["_id"] = str(existing["_id"])
-        return existing  # ⛔️ Aquí devuelves y sales, no calculas más
-
     # Paso 2: Obtener el _id y parametros necesarios del empleado (solo se hace por empleado)
     employee_collection = get_collection(tenant_id, 'employee')
     employee = employee_collection.find_one({"_id": ObjectId(employee_id)}, {"Nombres": 1, "Apellidos": 1, "Departamento": 1, "Cargo": 1, "Area": 1, "Fecha_de_inicio": 1})
 
     if not employee:
         return None, "No se encontró el colaborador a evaluar con el ID proporcionado."
+
+    if existing:
+        evaluation_result = {
+            "_id": employee_id,
+            "colaborador": f"{employee.get('Nombres', '')} {employee.get('Apellidos', '')}",
+            "departamento": existing.get("department", "No asignado"),
+            "cargo": existing.get("cargo", "No asignado"),
+            "nota_final": existing["nota_final"],
+            "desempenio": existing["desempenio"],
+            "color": existing["color"],
+            "notas_por_seccion": existing["notas_por_seccion"]
+        }
+        return evaluation_result  
 
     # Paso 3: Construir estructura de resultado
     resultado = {
@@ -672,10 +783,10 @@ def get_kpis_from_grupal_evaluation(evaluation, tenant_id, colaborador_id, start
 
         notas_por_seccion.append({
             "_id": str(seccion["_id"]),
-            "titulo_seccion": seccion.get("TituloSeccion", "Sin Título"),
+            "titulo": seccion.get("TituloSeccion", "Sin Título"),
             "nota_seccion": round(nota_seccion, 2),
             "nota_ponderada_seccion": round(nota_ponderada_seccion, 2),
-            "notas_kpis": detalles_kpis
+            "detalles_kpis": detalles_kpis
         })
 
     # Paso 6: Retornar los resultados
@@ -697,9 +808,6 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
     start_start_date, end_start_date = define_date_ranges(
         filter_range, start_date_str, end_date_str, evaluation['Dias_no_laborables']
     )
-
-    logger.info("start_date_str: %s", start_start_date)
-    logger.info("end_date_str: %s", end_start_date)
 
     # Paso 3: Buscar evaluación guardada
     evaluation_history_collection = get_collection(tenant_id, "evaluationhistory")
@@ -746,6 +854,10 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
     # Actualizar estructura resultado
     resultado["nota_final"] = resultado_kpis["nota_final"]
     resultado["notas_por_seccion"] = resultado_kpis["notas_por_seccion"]
+
+    logger.info("start_date_str: %s", start_start_date)
+    logger.info("end_date_str: %s", end_start_date)
+    logger.info("result %s", resultado_kpis["nota_final"])
 
      # Paso Final: asignar desempeño y color
     try:
