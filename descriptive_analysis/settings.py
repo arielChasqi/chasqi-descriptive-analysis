@@ -28,7 +28,7 @@ REDIS_DB = config('REDIS_DB', cast=int, default=0)
 FRONT_ACCES_CORS = config('FRONT_ACCES_CORS', default='http://localhost:3000')
 
 #Params to emit events in project
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_BROKER_URL = 'redis://redis-django:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 

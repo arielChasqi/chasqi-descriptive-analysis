@@ -10,7 +10,13 @@ logger = logging.getLogger(__name__)
 def get_cached_or_fresh_evaluation(tenant_id, evaluation_id): 
     #1. Buscar en Redis
     key = f"tenant:{tenant_id}:evaluation:{evaluation_id}"
+
+    logger.info("redis_client: %s", redis_client)
+
     cached = redis_client.get(key)
+
+    logger.info("cached: %s", cached)
+    
     if cached: 
         return json.loads(cached)
     #2. Si no está, traer desde MongoDB

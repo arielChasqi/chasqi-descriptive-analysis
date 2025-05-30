@@ -12,7 +12,21 @@ services:
     depends_on:
       - redis-django
     command: python manage.py runserver 0.0.0.0:3015
-    #command: gunicorn descriptive_analysis.wsgi:application --bind 0.0.0.0:3015 --workers 4 (Produccion)
+    networks:
+      - django-net
+
+  celery-worker:
+    build: .
+    container_name: celery-worker
+    restart: unless-stopped
+    depends_on:
+      - redis-django
+      - django
+    command: celery -A descriptive_analysis worker --loglevel=info --pool=solo
+    env_file:
+      - .env
+    networks:
+      - django-net
 
   redis-django:
     image: redis:6.2-alpine
@@ -23,7 +37,9 @@ services:
     volumes:
       - ./evaluation/redis.conf:/usr/local/etc/redis/redis.conf
     command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    networks:
+      - django-net
 
 networks:
-  default:
+  django-net:
     name: django-net

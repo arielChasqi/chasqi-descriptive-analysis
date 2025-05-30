@@ -805,7 +805,7 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
         return None, "No se encontró la evaluación con el ID proporcionado."
 
     # # Paso 2: Calcular fechas
-    start_start_date, end_start_date = define_date_ranges(
+    start_start_date, end_start_date, dias_laborables, dias_no_laborables = define_date_ranges(
         filter_range, start_date_str, end_date_str, evaluation['Dias_no_laborables']
     )
 
@@ -855,11 +855,11 @@ def calculate_single_employee_evaluation(tenant_id, evaluation_id, employee_id, 
     resultado["nota_final"] = resultado_kpis["nota_final"]
     resultado["notas_por_seccion"] = resultado_kpis["notas_por_seccion"]
 
-    logger.info("start_date_str: %s", start_start_date)
-    logger.info("end_date_str: %s", end_start_date)
-    logger.info("result %s", resultado_kpis["nota_final"])
+    #logger.info("start_date_str: %s", start_start_date)
+    #logger.info("end_date_str: %s", end_start_date)
+    #logger.info("result %s", resultado_kpis["nota_final"])
 
-     # Paso Final: asignar desempeño y color
+    # Paso Final: asignar desempeño y color
     try:
         metadata = get_evaluation_range_by_percentage(resultado["nota_final"], tenant_id)
         resultado["desempenio"] = metadata.get("title", "Sin clasificación") if metadata else "Sin clasificación"
@@ -991,10 +991,10 @@ def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, 
 
         notas_por_seccion.append({
             "_id": str(seccion["_id"]),
-            "titulo_seccion": seccion.get("TituloSeccion", "Sin Título"),
+            "titulo": seccion.get("TituloSeccion", "Sin Título"),
             "nota_seccion": round(nota_seccion, 2),
             "nota_ponderada_seccion": round(nota_ponderada_seccion, 2),
-            "notas_kpis": detalles_kpis
+            "detalles_kpis": detalles_kpis
         })
 
     # Paso 6: Retornar los resultados
