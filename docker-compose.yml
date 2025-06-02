@@ -27,6 +27,19 @@ services:
       - .env
     networks:
       - django-net
+    
+  celery-beat:
+    build: .
+    container_name: celery-beat
+    restart: unless-stopped
+    depends_on:
+      - django
+      - redis-django
+    command: celery -A descriptive_analysis beat --loglevel=info
+    env_file:
+      - .env
+    networks:
+      - django-net
 
   redis-django:
     image: redis:6.2-alpine

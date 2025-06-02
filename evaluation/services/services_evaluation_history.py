@@ -38,3 +38,14 @@ def save_or_update_kpi_evaluation(tenant_id: str, data: dict):
         result = collection.insert_one(data)
         new_doc = collection.find_one({"_id": result.inserted_id})
         return new_doc
+    
+
+def process_evaluation_for_group(tenant_id, task_id, colaborador_id, registros):
+    # Aquí puedes:
+    # - Verificar si ya existe una evaluación
+    # - Calcular los KPIs relevantes
+    # - Actualizar la nota o estado de cada evaluación
+    # - Guardar cambios en MongoDB
+
+    print(f"📊 Procesando evaluación: tenant={tenant_id}, task={task_id}, colaborador={colaborador_id}")
+    # TODO: implementar lógica real

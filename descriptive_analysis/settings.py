@@ -28,9 +28,11 @@ REDIS_DB = config('REDIS_DB', cast=int, default=0)
 FRONT_ACCES_CORS = config('FRONT_ACCES_CORS', default='http://localhost:3000')
 
 #Params to emit events in project
-CELERY_BROKER_URL = 'redis://redis-django:6379/0'
+CELERY_BROKER_URL = 'redis://localhost:6381/0'
+#CELERY_BROKER_URL = 'redis://redis-django:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -41,7 +43,7 @@ SECRET_KEY = 'django-insecure-1re7xq#9rd3=5ib%)ga_p6h^g7^5hh9!$9+k7a5d3aw-*3m-co
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['da53-2800-bf0-177-1249-e5cc-2322-d867-bdb6.ngrok-free.app', '3.22.250.72', 'localhost', '127.0.0.1', 'chasqi.ai']
+ALLOWED_HOSTS = ['1874-2800-bf0-177-1249-c5e4-eb5b-5651-c348.ngrok-free.app', '3.22.250.72', 'localhost', '127.0.0.1', 'chasqi.ai']
 
 # Application definition
 
@@ -52,6 +54,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'evaluation.apps.EvaluationConfig',
+    "django_celery_beat",
     'corsheaders',
 ]
 
