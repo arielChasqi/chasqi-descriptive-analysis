@@ -64,12 +64,12 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
 
     #logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
 
-    #logger.info("kpi_data: %s", kpi_data)
-    #logger.info("task_id: %s", task_id)
-    #logger.info("tenant_id: %s", tenant_id)
-    #logger.info("colaborador_id: %s", colaborador_id)
-    #logger.info("start_date: %s", start_date)
-    #logger.info("end_date: %s", end_date)
+    logger.info("kpi_data: %s", kpi_data)
+    logger.info("task_id: %s", task_id)
+    logger.info("tenant_id: %s", tenant_id)
+    logger.info("colaborador_id: %s", colaborador_id)
+    logger.info("start_date: %s", start_date)
+    logger.info("end_date: %s", end_date)
 
     try:
         filter_date = kpi_data.get("Filtro_de_fecha", "Fecha_de_creacion")
