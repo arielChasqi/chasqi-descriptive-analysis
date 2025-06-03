@@ -16,23 +16,24 @@ def save_employee_evaluation_task(tenant_id, data):
 def process_tasklog_events():
     print("🔁 Procesando eventos tasklog_events...")
 
-    events = redis_client.lrange("tasklog_events", 0, -1)
-    print(f"Total eventos en cola: {len(events)}")
+    raw_events = redis_client.lrange("tasklog_events", 0, -1)
+    print(f"Total eventos en cola: {len(raw_events)}")
 
     grouped = {}
+    to_keep = []  # Eventos que no deben procesarse aún
 
-    for raw_event in events:
+    for raw_event in raw_events:
         try:
             event = json.loads(raw_event)
             tenant = event.get("tenant")
             payload = json.loads(event["payload"])
 
-            # Preferimos usar Ultima_actualizacion si existe, si no, Fecha_de_creacion
             fecha_str = payload.get("Ultima_actualizacion") or payload.get("Fecha_de_creacion")
+            print(f"📅 Fecha del evento: {fecha_str}")
 
-            # Verifica que el evento tenga al menos 2 minutos
-            if not is_event_stale(fecha_str):
-                print("⏳ Evento muy reciente o sin fecha válida. Se omite temporalmente.")
+            if not is_event_stale(fecha_str, buffer_minutes=1):  # o 20 luego
+                print("⏳ Evento muy reciente. Se mantiene en cola.")
+                to_keep.append(raw_event)
                 continue
 
             task_id = payload.get("TaskId")
@@ -43,7 +44,9 @@ def process_tasklog_events():
 
         except Exception as e:
             print(f"❌ Error procesando evento: {e}")
+            to_keep.append(raw_event)  # En caso de error, no lo pierdas
 
+    # Procesar grupos
     for tenant_id, tareas in grouped.items():
         for task_id, empleados in tareas.items():
             for colaborador_id, registros in empleados.items():
@@ -52,5 +55,9 @@ def process_tasklog_events():
                 except Exception as e:
                     print(f"❌ Error al procesar grupo: {e}")
 
+    # Limpiar solo lo que ya fue procesado
     redis_client.delete("tasklog_events")
-    print("✅ Cola de eventos limpiada.")
+    for ev in to_keep:
+        redis_client.rpush("tasklog_events", ev)
+
+    print("✅ Procesamiento finalizado. Eventos recientes se mantienen en cola.")
