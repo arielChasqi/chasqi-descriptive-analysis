@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 LOCAL_TZ = pytz.timezone("America/Guayaquil")
 
-def save_or_update_kpi_evaluation(tenant_id: str, data: dict):
+def save_or_update_evaluation(tenant_id: str, data: dict):
     """
     Guarda o actualiza la evaluación KPI de un empleado para un filtro y rango específico
     usando pymongo y conexión dinámica multi-tenant.
     """
-    #logger.info("Estoy en save_or_update_kpi_evaluation la función que guarda %s")
+    #logger.info("Estoy en save_or_update_evaluation la función que guarda %s")
 
     collection = get_collection(tenant_id, "evaluationhistory")  # O el nombre que uses
 
@@ -48,7 +48,40 @@ def save_or_update_kpi_evaluation(tenant_id: str, data: dict):
         new_doc = collection.find_one({"_id": result.inserted_id})
         return new_doc
     
+def save_or_update_metric_kpi_evaluation(tenant_id: str, data: dict):
+    """
+    Guarda o actualiza la evaluación KPI de un empleado para un filtro y rango específico
+    usando pymongo y conexión dinámica multi-tenant.
+    """
+    #logger.info("Estoy en save_or_update_evaluation la función que guarda %s")
 
+    collection = get_collection(tenant_id, "kpievaluationhistory")  # O el nombre que uses
+
+    # Construir filtro para buscar documento existente
+    filter_query = {
+        "employeeId": data.get("employee_id"),
+        "kpiId": data.get("kpi_id"),
+        "Fecha_de_inicio": data.get("start_date"),
+        "Fecha_de_fin": data.get("end_date"),
+    }
+
+    # Actualizar o insertar campo "created_at"
+    data["Fecha_de_creacion"] = datetime.utcnow()
+
+    # Buscar si ya existe documento
+    existing = collection.find_one(filter_query)
+
+    if existing:
+        # Actualizar el documento existente
+        collection.update_one(filter_query, {"$set": data})
+        updated_doc = collection.find_one(filter_query)
+        return updated_doc
+    else:
+        # Insertar nuevo documento
+        result = collection.insert_one(data)
+        new_doc = collection.find_one({"_id": result.inserted_id})
+        return new_doc
+    
 def normalize_to_local_date(iso_str):
     dt = parse_date(iso_str)
     local_dt = dt.astimezone(LOCAL_TZ)
@@ -73,7 +106,7 @@ def process_task_group(tenant_id, task_id, colaboradores_data):
     kpi_ids = [ObjectId(kpi_id) for kpi_id in task["Kpis"]]
     kpis = list(kpi_collection.find(
         {"_id": {"$in": kpi_ids}},
-        {"Nombre": 1, "Objetivo": 1, "Formula": 1, 
+        {"Nombre": 1, "Objetivo": 1, "Formula": 1, "Tipo_de_KPI": 1,
         "Campo_a_evaluar": 1, "Filtro_de_fecha": 1,
         "Filters": 1, "Dias_no_laborables": 1}
     ))
@@ -136,18 +169,34 @@ def process_kpi_evaluations(tenant_id, task_id, kpis, agrupados):
     return resultados
 
 def calculate_single_evaluation(tenant_id, task_id, colaborador_id, fecha, start_date, end_date, kpis):
-
     """
-    Ejecuta en paralelo las evaluaciones de cada KPI para un colaborador en un rango de fechas.
+    Ejecuta en paralelo las evaluaciones de cada KPI para un colaborador en un rango de fechas,
+    y guarda cada resultado en la colección de evaluaciones históricas.
     """
     def wrapper(kpi_data):
         result = get_kpi_evaluation(task_id, kpi_data, tenant_id, colaborador_id, start_date, end_date)
-        print(f"📦 Resultado para KPI {kpi_data.get('nombre')}: {result}")
-        return result
+
+        print(f"📦 Resultado para KPI {kpi_data.get('Nombre')}: {result}")
+
+        save_data = {
+            "employeeId": ObjectId(colaborador_id),
+            "kpiId": kpi_data["_id"],
+            "labelId": "",
+            "Nota": result.get("kpiPercentage", 0.0),
+            "Numero_total": result.get("totalCount", 0),
+            "Numero_objetivo": result.get("targetSales", 0),
+            "Numero_faltantes_excedentes": abs(result.get("targetSales", 0) - result.get("totalCount", 0)),
+            "Fecha_de_inicio": start_date,
+            "Fecha_de_fin": end_date,
+            "Numero_de_Dias_laborales": result.get("daysConsidered", 0),
+            "Numero_de_Dias_no_laborales": result.get("nonConsideredDaysCount", 0),
+        }
+
+        saved_doc = save_or_update_metric_kpi_evaluation(tenant_id, save_data)
+        return saved_doc  # Podrías también devolver el resultado crudo si lo prefieres
 
     with ThreadPoolExecutor() as executor:
         results = list(executor.map(wrapper, kpis))
 
-    print("🧪 Results (final):", json.dumps(results, indent=2, default=str))
-
     return results
+

@@ -10,7 +10,7 @@ from evaluation.services.evaluation_cache import get_cached_or_fresh_evaluation
 from evaluation.utils.redis_client import redis_client
 from .services.custom_performance import get_evaluation_range_by_percentage
 from .services.evaluations_analysis import calculate_single_employee_evaluation
-from .services.services_evaluation_history import save_or_update_kpi_evaluation
+from .services.services_evaluation_history import save_or_update_evaluation
 from evaluation.mongo_client import get_collection
 
 class CustomPerformanceTestCase(TestCase):
@@ -156,14 +156,14 @@ class EvaluationServiceTestCase(TestCase):
 
     def test_insert_and_update_kpi_evaluation(self):
         # Insertar documento
-        inserted_doc = save_or_update_kpi_evaluation(self.tenant_id, self.data)
+        inserted_doc = save_or_update_evaluation(self.tenant_id, self.data)
         self.assertIsNotNone(inserted_doc)
         self.assertEqual(inserted_doc['employee_id'], self.data['employee_id'])
         self.assertEqual(inserted_doc['nota_final'], self.data['nota_final'])
 
         # Actualizar datos
         self.data['nota_final'] = 82.3
-        updated_doc = save_or_update_kpi_evaluation(self.tenant_id, self.data)
+        updated_doc = save_or_update_evaluation(self.tenant_id, self.data)
         self.assertIsNotNone(updated_doc)
         self.assertEqual(updated_doc['nota_final'], 82.3)
         self.assertEqual(updated_doc['_id'], inserted_doc['_id'])  # Mismo documento

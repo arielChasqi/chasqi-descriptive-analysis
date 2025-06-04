@@ -62,7 +62,7 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
 
     task_logs_collection = get_collection(tenant_id, 'tasklog')
 
-    #logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
+    logger.info("<-----------------Inicia la evaluación de un KPI ------------------------------------------>: %s")
 
     logger.info("kpi_data: %s", kpi_data)
     logger.info("task_id: %s", task_id)
@@ -166,7 +166,7 @@ def get_kpi_evaluation(task_id: str, kpi_data: Dict[str, Any], tenant_id: str,
     #logger.info("target_sales: %s", target_sales)
     #logger.info("non_considered_days: %s", non_considered_days)
 
-    #logger.info("<-----------------Finaliza la evaluación de un KPI ------------------------------------------>: %s")
+    logger.info("<-----------------Finaliza la evaluación de un KPI ------------------------------------------>: %s")
 
     return {
         "kpiPercentage": rounded_kpi_percentage,

@@ -42,7 +42,7 @@ SECRET_KEY = 'django-insecure-1re7xq#9rd3=5ib%)ga_p6h^g7^5hh9!$9+k7a5d3aw-*3m-co
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['40dd-2800-bf0-177-1249-157e-9bb-a2cc-db24.ngrok-free.app', '3.22.250.72', 'localhost', '127.0.0.1', 'chasqi.ai']
+ALLOWED_HOSTS = ['3c10-2800-bf0-177-1249-60a2-bcdb-c1fe-ef14.ngrok-free.app', '3.22.250.72', 'localhost', '127.0.0.1', 'chasqi.ai']
 
 # Application definition
 
