@@ -992,6 +992,7 @@ def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, 
         notas_por_seccion.append({
             "_id": str(seccion["_id"]),
             "titulo": seccion.get("TituloSeccion", "Sin Título"),
+            "peso_seccion": seccion.get("PesoSeccion", 0),
             "nota_seccion": round(nota_seccion, 2),
             "nota_ponderada_seccion": round(nota_ponderada_seccion, 2),
             "detalles_kpis": detalles_kpis
