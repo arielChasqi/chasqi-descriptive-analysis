@@ -405,7 +405,8 @@ def calculate_evaluation_for_department(tenant_id, employees, filter_range, star
                 "evaluation": emp.get("nombreEvaluacion", "Sin nombre"),
                 "score": emp["nota_final"],
                 "performance": emp["desempenio"],
-                "color": emp["color"]
+                "color": emp["color"],
+                "notas_por_seccion":  emp["notas_por_seccion"]
             })
 
         department_result["sections"].append(section_data)
@@ -471,6 +472,7 @@ def calculate_single_employee_evaluation_department(tenant_id, employee, filter_
         "color": existing["color"],
         "evaluationId": str(existing["evaluacion_id"]),
         "nombreEvaluacion": evaluation.get("Nombre", "Sin nombre"),
+        "notas_por_seccion": existing["notas_por_seccion"]
         }
         return evaluation_result
 
