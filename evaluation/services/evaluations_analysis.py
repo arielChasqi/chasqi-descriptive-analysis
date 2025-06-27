@@ -705,7 +705,7 @@ def get_kpis_from_grupal_evaluation(evaluation, tenant_id, colaborador_id, start
             label_id = str(kpi.get("Etiqueta")) if kpi.get("Etiqueta") else None
             tipo_kpi = kpi.get("Tipo_de_KPI")
 
-            if tipo_kpi in ["question", "dropdown", "static_metrics"]:
+            if tipo_kpi in ["formulario", "question", "dropdown", "static_metrics"]:
                 kpis_tipo_evaluacion.append({
                     "kpi_id": kpi_id,
                     "peso_kpi": peso_kpi,
@@ -723,7 +723,7 @@ def get_kpis_from_grupal_evaluation(evaluation, tenant_id, colaborador_id, start
         if kpis_tipo_evaluacion:
             # Construir el pipeline de agregación para todos los KPIs de tipo evaluación
             pipeline_match = {
-                "employeeId": ObjectId(colaborador_id),
+                "colaboradorId": ObjectId(colaborador_id),
                 "$or": [
                     {
                         "kpiId": ObjectId(kpi["kpi_id"]),
@@ -913,7 +913,7 @@ def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, 
             label_id = str(kpi.get("Etiqueta")) if kpi.get("Etiqueta") else None
             tipo_kpi = kpi.get("Tipo_de_KPI")
 
-            if tipo_kpi in ["question", "dropdown", "static_metrics"]:
+            if tipo_kpi in ["formulario", "question", "dropdown", "static_metrics"]:
                 kpis_tipo_evaluacion.append({
                     "kpi_id": kpi_id,
                     "peso_kpi": peso_kpi,
@@ -931,7 +931,7 @@ def get_kpis_from_evaluation(evaluation, tenant_id, colaborador_id, start_date, 
         if kpis_tipo_evaluacion:
             # Construir el pipeline de agregación para todos los KPIs de tipo evaluación
             pipeline_match = {
-                "employeeId": ObjectId(colaborador_id),
+                "colaboradorId": ObjectId(colaborador_id),
                 "$or": [
                     {
                         "kpiId": ObjectId(kpi["kpi_id"]),
